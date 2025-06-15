@@ -1,9 +1,22 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog
+
+class CustomUserCreationForm(UserCreationForm):
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ('username', 'email', 'student_id', 'role')
+
+class CustomUserChangeForm(UserChangeForm):
+    class Meta(UserChangeForm.Meta):
+        model = User
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
+    form = CustomUserChangeForm
+    add_form = CustomUserCreationForm
+    
     list_display = ('username', 'email', 'student_id', 'role', 'is_staff')
     list_filter = ('role', 'is_staff', 'is_active')
     search_fields = ('username', 'email', 'student_id')

@@ -1,10 +1,13 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 from django.db.models import Count
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from django.contrib.auth import authenticate
 from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog
 from .serializers import (
     UserSerializer, ElectionSerializer, PositionSerializer, CandidateSerializer,
@@ -13,15 +16,40 @@ from .serializers import (
 from .permissions import IsAdminOrReadOnly, IsEligibleVoter
 from .utils import log_audit
 
+class LoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'user': UserSerializer(user).data
+            })
+        return Response(
+            {'error': 'Invalid credentials'}, 
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+class LogoutView(APIView):
+    def post(self, request):
+        try:
+            refresh_token = request.data.get('refresh')
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response(status=status.HTTP_205_RESET_CONTENT)
+        except Exception:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAdminUser]
-    
-    def get_queryset(self):
-        if self.request.user.role == User.ADMIN:
-            return User.objects.all()
-        return User.objects.filter(id=self.request.user.id)
 
 class ElectionViewSet(viewsets.ModelViewSet):
     queryset = Election.objects.all()
@@ -68,9 +96,9 @@ class ElectionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def results(self, request, pk=None):
         election = self.get_object()
-        if election.status != 'completed':
+        if election.status not in ['active', 'completed']:
             return Response(
-                {'error': 'Results are only available for completed elections'},
+                {'error': 'Results are only available for active or completed elections'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -78,7 +106,6 @@ class ElectionViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 class PositionViewSet(viewsets.ModelViewSet):
-    queryset = Position.objects.all()
     serializer_class = PositionSerializer
     permission_classes = [IsAdminOrReadOnly]
     
@@ -86,56 +113,77 @@ class PositionViewSet(viewsets.ModelViewSet):
         return Position.objects.filter(election_id=self.kwargs['election_pk'])
 
 class CandidateViewSet(viewsets.ModelViewSet):
-    queryset = Candidate.objects.all()
     serializer_class = CandidateSerializer
     permission_classes = [IsAdminOrReadOnly]
     
     def get_queryset(self):
         return Candidate.objects.filter(position_id=self.kwargs['position_pk'])
 
-class EligibleVoterViewSet(viewsets.ModelViewSet):
-    queryset = EligibleVoter.objects.all()
-    serializer_class = EligibleVoterSerializer
-    permission_classes = [permissions.IsAdminUser]
-
 class VoteViewSet(viewsets.ModelViewSet):
-    queryset = Vote.objects.all()
     serializer_class = VoteSerializer
     permission_classes = [IsEligibleVoter]
     
-    def perform_create(self, serializer):
-        # Check if student has already voted for this position
-        existing_vote = Vote.objects.filter(
-            election=serializer.validated_data['election'],
-            position=serializer.validated_data['position'],
-            student=self.request.user
-        ).exists()
+    def get_queryset(self):
+        return Vote.objects.filter(student=self.request.user)
+    
+    def create(self, request, *args, **kwargs):
+        election_id = request.data.get('election')
+        position_id = request.data.get('position')
+        candidate_id = request.data.get('candidate')
         
-        if existing_vote:
-            raise serializers.ValidationError(
-                'You have already voted for this position'
+        try:
+            election = Election.objects.get(id=election_id)
+            position = Position.objects.get(id=position_id)
+            candidate = Candidate.objects.get(id=candidate_id)
+            
+            # Check if election is active
+            if election.status != 'active':
+                return Response(
+                    {'error': 'Can only vote in active elections'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if user has already voted for this position
+            existing_vote = Vote.objects.filter(
+                election=election,
+                position=position,
+                student=request.user
+            ).first()
+            
+            if existing_vote:
+                # Update existing vote
+                existing_vote.candidate = candidate
+                existing_vote.save()
+                vote = existing_vote
+            else:
+                # Create new vote
+                vote = Vote.objects.create(
+                    election=election,
+                    position=position,
+                    candidate=candidate,
+                    student=request.user
+                )
+            
+            # Broadcast updated results
+            channel_layer = get_channel_layer()
+            results = ElectionResultsSerializer(election).data
+            async_to_sync(channel_layer.group_send)(
+                f'election_{election_id}_results',
+                {
+                    'type': 'election_results_update',
+                    'results': results
+                }
             )
-        
-        # Create the vote
-        vote = serializer.save(student=self.request.user)
-        
-        # Update eligible voter status
-        EligibleVoter.objects.filter(
-            election=vote.election,
-            student=self.request.user
-        ).update(has_voted=True)
-        
-        # Log the vote
-        log_audit(
-            self.request.user,
-            'cast_vote',
-            f'Voted for {vote.candidate.name} in {vote.position.title}'
-        )
+            
+            return Response(self.get_serializer(vote).data)
+            
+        except (Election.DoesNotExist, Position.DoesNotExist, Candidate.DoesNotExist):
+            return Response(
+                {'error': 'Invalid election, position, or candidate'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = AuditLog.objects.all()
+    queryset = AuditLog.objects.all().order_by('-timestamp')
     serializer_class = AuditLogSerializer
-    permission_classes = [permissions.IsAdminUser]
-    
-    def get_queryset(self):
-        return AuditLog.objects.all().order_by('-timestamp') 
+    permission_classes = [permissions.IsAdminUser] 

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Results - {{ election.title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+        .position-card {
+            margin-bottom: 30px;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            background-color: white;
+        }
+        .candidate-card {
+            margin-bottom: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: white;
+        }
+        .vote-count {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .progress {
+            height: 25px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/">College Election Portal</a>
+                <div class="navbar-nav ms-auto">
+                    <span class="nav-item nav-link">Welcome, {{ request.user.username }}</span>
+                    <a class="nav-link" href="/logout/">Logout</a>
+                </div>
+            </div>
+        </nav>
+
+        <h2 class="mb-4">{{ election.title }} - Live Results</h2>
+        <p class="text-muted mb-4">{{ election.description }}</p>
+
+        <div id="results-container">
+            <!-- Results will be dynamically updated here -->
+        </div>
+    </div>
+
+    <script>
+        // Connect to WebSocket
+        const electionId = {{ election.id }};
+        const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+        const ws_path = `${ws_scheme}://${window.location.host}/ws/public/elections/${electionId}/live-results/`;
+        console.log('Connecting to WebSocket at:', ws_path);
+        
+        const socket = new WebSocket(ws_path);
+
+        socket.onopen = function(e) {
+            console.log('WebSocket connection established');
+        };
+
+        socket.onmessage = function(e) {
+            console.log('Received message:', e.data);
+            const data = JSON.parse(e.data);
+            updateResults(data);
+        };
+
+        socket.onclose = function(e) {
+            console.error('Socket closed unexpectedly:', e);
+        };
+
+        socket.onerror = function(e) {
+            console.error('WebSocket error:', e);
+        };
+
+        // Request initial results
+        function requestInitialResults() {
+            fetch(`/api/elections/${electionId}/results/`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Initial results:', data);
+                    updateResults(data);
+                })
+                .catch(error => console.error('Error fetching initial results:', error));
+        }
+
+        // Call this when the page loads
+        requestInitialResults();
+
+        function updateResults(data) {
+            console.log('Updating results with:', data);
+            const container = document.getElementById('results-container');
+            let html = '';
+
+            if (data.error) {
+                html = `<div class="alert alert-danger">${data.error}</div>`;
+                container.innerHTML = html;
+                return;
+            }
+
+            data.positions.forEach(position => {
+                html += `
+                    <div class="position-card">
+                        <h3 class="mb-3">${position.position_title}</h3>
+                        <div class="candidates">
+                `;
+
+                position.candidates.forEach(candidate => {
+                    const totalVotes = position.candidates.reduce((sum, c) => sum + c.vote_count, 0);
+                    const percentage = totalVotes > 0 ? (candidate.vote_count / totalVotes * 100).toFixed(1) : 0;
+                    
+                    html += `
+                        <div class="candidate-card">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0">${candidate.candidate_name}</h5>
+                                <span class="vote-count">${candidate.vote_count} votes</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" 
+                                     style="width: ${percentage}%" 
+                                     aria-valuenow="${percentage}" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                    ${percentage}%
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vote - {{ election.title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+        .position-card {
+            margin-bottom: 30px;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            background-color: white;
+        }
+        .candidate-card {
+            margin-bottom: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .candidate-card:hover {
+            background-color: #f8f9fa;
+        }
+        .candidate-card.selected {
+            border-color: #0d6efd;
+            background-color: #e7f1ff;
+        }
+        .candidate-photo {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 50%;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/">College Election Portal</a>
+                <div class="navbar-nav ms-auto">
+                    <span class="nav-item nav-link">Welcome, {{ request.user.username }}</span>
+                    <a class="nav-link" href="/logout/">Logout</a>
+                </div>
+            </div>
+        </nav>
+
+        <h2 class="mb-4">{{ election.title }}</h2>
+        <p class="text-muted mb-4">{{ election.description }}</p>
+
+        <form method="post">
+            {% csrf_token %}
+            
+            {% for position_data in positions %}
+                <div class="position-card">
+                    <h3 class="mb-3">{{ position_data.position.title }}</h3>
+                    <p class="text-muted mb-4">{{ position_data.position.description }}</p>
+                    
+                    {% if position_data.has_voted %}
+                        <div class="alert alert-info">
+                            You have already voted for this position.
+                        </div>
+                    {% endif %}
+                    
+                    <div class="row">
+                        {% for candidate in position_data.candidates %}
+                            <div class="col-md-6">
+                                <div class="candidate-card" onclick="selectCandidate(this, '{{ position_data.position.id }}', '{{ candidate.id }}')">
+                                    {% if candidate.photo %}
+                                        <img src="{{ candidate.photo.url }}" alt="{{ candidate.name }}" class="candidate-photo">
+                                    {% endif %}
+                                    <h5>{{ candidate.name }}</h5>
+                                    <p class="text-muted">{{ candidate.bio }}</p>
+                                    <input type="radio" 
+                                           name="position_{{ position_data.position.id }}" 
+                                           value="{{ candidate.id }}"
+                                           {% if position_data.has_voted %}disabled{% endif %}
+                                           style="display: none;">
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+            
+            <div class="text-center mb-5">
+                <button type="submit" class="btn btn-primary btn-lg">Submit Votes</button>
+                <a href="/" class="btn btn-secondary btn-lg ms-2">Back to Elections</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        function selectCandidate(card, positionId, candidateId) {
+            // Deselect all candidates for this position
+            document.querySelectorAll(`input[name="position_${positionId}"]`).forEach(radio => {
+                radio.checked = false;
+                radio.closest('.candidate-card').classList.remove('selected');
+            });
+            
+            // Select the clicked candidate
+            const radio = card.querySelector('input[type="radio"]');
+            radio.checked = true;
+            card.classList.add('selected');
+        }
+    </script>
+</body>
+</html> 
