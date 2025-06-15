@@ -163,6 +163,14 @@ class VoteViewSet(viewsets.ModelViewSet):
                     candidate=candidate,
                     student=request.user
                 )
+                
+                # Update has_voted in EligibleVoter
+                eligible_voter = EligibleVoter.objects.get(
+                    election=election,
+                    student=request.user
+                )
+                eligible_voter.has_voted = True
+                eligible_voter.save()
             
             # Broadcast updated results
             channel_layer = get_channel_layer()
@@ -181,6 +189,11 @@ class VoteViewSet(viewsets.ModelViewSet):
             return Response(
                 {'error': 'Invalid election, position, or candidate'},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        except EligibleVoter.DoesNotExist:
+            return Response(
+                {'error': 'You are not eligible to vote in this election'},
+                status=status.HTTP_403_FORBIDDEN
             )
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
