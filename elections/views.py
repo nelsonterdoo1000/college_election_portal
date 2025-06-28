@@ -15,6 +15,7 @@ from .serializers import (
 )
 from .permissions import IsAdminOrReadOnly, IsEligibleVoter
 from .utils import log_audit
+from django.http import JsonResponse
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -199,4 +200,7 @@ class VoteViewSet(viewsets.ModelViewSet):
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.all().order_by('-timestamp')
     serializer_class = AuditLogSerializer
-    permission_classes = [permissions.IsAdminUser] 
+    permission_classes = [permissions.IsAdminUser]
+
+def api_root(request):
+    return JsonResponse({"message": "Welcome to the College Election API."}) 

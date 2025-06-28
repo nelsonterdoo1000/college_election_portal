@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_nested import routers
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
+from .views import api_root
 
 # Create a router and register our viewsets with it
 router = DefaultRouter()
@@ -19,6 +20,7 @@ positions_router = routers.NestedDefaultRouter(elections_router, r'positions', l
 positions_router.register(r'candidates', views.CandidateViewSet, basename='position-candidates')
 
 urlpatterns = [
+    path('', api_root),
     # Authentication endpoints
     path('auth/login/', views.LoginView.as_view(), name='login'),
     path('auth/logout/', views.LogoutView.as_view(), name='logout'),
