@@ -5,7 +5,11 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 from django.db.models import Count
-from channels.layers import get_channel_layer
+try:
+    from channels.layers import get_channel_layer
+except ImportError:
+    # Fallback for older versions
+    from channels import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.contrib.auth import authenticate
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
