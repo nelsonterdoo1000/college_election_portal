@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_nested import routers
 from rest_framework_simplejwt.views import TokenRefreshView
+from django.shortcuts import redirect
 from . import views
 from .views import api_root
 
@@ -19,12 +20,18 @@ elections_router.register(r'positions', views.PositionViewSet, basename='electio
 positions_router = routers.NestedDefaultRouter(elections_router, r'positions', lookup='position')
 positions_router.register(r'candidates', views.CandidateViewSet, basename='position-candidates')
 
+def redirect_to_docs(request):
+    return redirect('/api/docs/')
+
 urlpatterns = [
-    path('', api_root),
+    path('', redirect_to_docs, name='api-root'),
     # Authentication endpoints
     path('auth/login/', views.LoginView.as_view(), name='login'),
     path('auth/logout/', views.LogoutView.as_view(), name='logout'),
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
+    # Public endpoints
+    path('elections/<int:election_id>/results/', views.ElectionResultsView.as_view(), name='election-results'),
     
     # API endpoints
     path('api/', include(router.urls)),

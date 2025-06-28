@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from typing import List, Dict, Any
 from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog
 
 class UserSerializer(serializers.ModelSerializer):
@@ -42,7 +43,7 @@ class ElectionResultsSerializer(serializers.ModelSerializer):
         model = Election
         fields = ['id', 'title', 'positions']
     
-    def get_positions(self, obj):
+    def get_positions(self, obj) -> List[Dict[str, Any]]:
         positions = Position.objects.filter(election=obj)
         result = []
         

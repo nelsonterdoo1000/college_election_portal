@@ -18,11 +18,15 @@ django-material-admin==1.8.6
 djangorestframework==3.16.0
 djangorestframework_simplejwt==5.5.0
 drf-nested-routers==0.94.2
+drf-spectacular==0.28.0
 gunicorn==23.0.0
 h11==0.16.0
 hyperlink==21.0.0
 idna==3.10
 incremental==24.7.2
+inflection==0.5.1
+jsonschema==4.24.0
+jsonschema-specifications==2025.4.1
 msgpack==1.1.0
 oauthlib==3.2.2
 packaging==25.0
@@ -34,9 +38,12 @@ pycparser==2.22
 PyJWT==2.9.0
 pyOpenSSL==25.1.0
 python-dotenv==1.1.0
+PyYAML==6.0.2
 redis==6.2.0
+referencing==0.36.2
 requests==2.32.3
 requests-oauthlib==2.0.0
+rpds-py==0.25.1
 service-identity==24.2.0
 setuptools==80.9.0
 six==1.17.0
@@ -44,6 +51,7 @@ sqlparse==0.5.3
 Twisted==25.5.0
 txaio==23.1.1
 typing_extensions==4.14.0
+uritemplate==4.2.0
 urllib3==2.4.0
 uvicorn==0.34.3
 zope.interface==7.2

@@ -19,7 +19,7 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,gttech.pythonany
 
 # Application definition
 INSTALLED_APPS = [
-    # 'material', #default admin override file
+    'material', #default admin override file
     'django.contrib.auth',
     'django.contrib.admin',
     'django.contrib.contenttypes',
@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'channels',
     'corsheaders',
+    'drf_spectacular',
     
     # Local apps
     'elections',
@@ -128,6 +129,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # JWT settings
@@ -153,4 +155,38 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY' 
+    X_FRAME_OPTIONS = 'DENY'
+
+# drf-spectacular settings
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'College Election Portal API',
+    'DESCRIPTION': 'A comprehensive API for managing college elections with real-time voting and results.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': '/api/',
+    'CONTACT': {
+        'name': 'College Election Portal Team',
+        'email': 'admin@college.edu',
+    },
+    'LICENSE': {
+        'name': 'MIT License',
+    },
+    'TAGS': [
+        {'name': 'authentication', 'description': 'Authentication endpoints'},
+        {'name': 'elections', 'description': 'Election management endpoints'},
+        {'name': 'positions', 'description': 'Position management endpoints'},
+        {'name': 'candidates', 'description': 'Candidate management endpoints'},
+        {'name': 'voting', 'description': 'Voting endpoints'},
+        {'name': 'users', 'description': 'User management endpoints'},
+        {'name': 'audit', 'description': 'Audit log endpoints'},
+    ],
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': True,
+    },
+    'REDOC_UI_SETTINGS': {
+        'hideDownloadButton': True,
+    },
+} 
