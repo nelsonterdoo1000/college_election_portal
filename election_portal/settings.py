@@ -19,7 +19,7 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,gttech.pythonany
 
 # Application definition
 INSTALLED_APPS = [
-    'material', #default admin override file
+    # 'material', #default admin override file
     'django.contrib.auth',
     'django.contrib.admin',
     'django.contrib.contenttypes',
