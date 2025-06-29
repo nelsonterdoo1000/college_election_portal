@@ -31,6 +31,7 @@ urlpatterns = [
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     # Public endpoints
+    path('elections/', views.PublicElectionsView.as_view(), name='public-elections'),
     path('elections/<int:election_id>/results/', views.ElectionResultsView.as_view(), name='election-results'),
     
     # API endpoints

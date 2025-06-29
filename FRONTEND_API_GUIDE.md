@@ -62,7 +62,39 @@ const apiCall = async (endpoint, options = {}) => {
 
 ## Core Endpoints
 
-### 1. Get Election Results (Public - No Auth Required)
+### 1. List Public Elections (Public - No Auth Required)
+```javascript
+// GET /elections/
+const getPublicElections = async () => {
+  const response = await fetch('https://gttech.pythonanywhere.com/elections/');
+  return response.json();
+};
+
+// Example usage
+const elections = await getPublicElections();
+console.log(elections);
+// Response:
+// [
+//   {
+//     "id": 1,
+//     "title": "Student Council Election 2024",
+//     "description": "Annual student council election",
+//     "status": "active",
+//     "start_datetime": "2024-03-01T09:00:00Z",
+//     "end_datetime": "2024-03-01T17:00:00Z"
+//   },
+//   {
+//     "id": 2,
+//     "title": "Class Representative Election 2024",
+//     "description": "Class representative election",
+//     "status": "completed",
+//     "start_datetime": "2024-02-15T09:00:00Z",
+//     "end_datetime": "2024-02-15T17:00:00Z"
+//   }
+// ]
+```
+
+### 2. Get Election Results (Public - No Auth Required)
 ```javascript
 // GET /elections/{election_id}/results/
 const getElectionResults = async (electionId) => {
@@ -98,7 +130,7 @@ console.log(results);
 // }
 ```
 
-### 2. List Elections
+### 3. List Elections
 ```javascript
 // GET /api/elections/
 const getElections = async () => {
@@ -106,7 +138,7 @@ const getElections = async () => {
 };
 ```
 
-### 3. Get Election Details
+### 4. Get Election Details
 ```javascript
 // GET /api/elections/{id}/
 const getElectionDetails = async (electionId) => {
@@ -114,7 +146,7 @@ const getElectionDetails = async (electionId) => {
 };
 ```
 
-### 4. Cast a Vote
+### 5. Cast a Vote
 ```javascript
 // POST /api/votes/
 const castVote = async (electionId, positionId, candidateId) => {
@@ -129,7 +161,7 @@ const castVote = async (electionId, positionId, candidateId) => {
 };
 ```
 
-### 5. Get User's Votes
+### 6. Get User's Votes
 ```javascript
 // GET /api/votes/
 const getUserVotes = async () => {
@@ -283,6 +315,119 @@ const handleApiError = (error) => {
 
 ## Complete React Component Example
 
+### Public Election Results Viewer
+```javascript
+import React, { useState, useEffect } from 'react';
+
+const PublicElectionResults = () => {
+  const [elections, setElections] = useState([]);
+  const [selectedElection, setSelectedElection] = useState(null);
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch available elections
+  useEffect(() => {
+    const fetchElections = async () => {
+      try {
+        const response = await fetch('https://gttech.pythonanywhere.com/elections/');
+        const data = await response.json();
+        setElections(data);
+        
+        // Auto-select the first active election
+        const activeElection = data.find(e => e.status === 'active');
+        if (activeElection) {
+          setSelectedElection(activeElection);
+        }
+      } catch (err) {
+        setError('Failed to load elections');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchElections();
+  }, []);
+
+  // Fetch results when election is selected
+  useEffect(() => {
+    if (!selectedElection) return;
+
+    const fetchResults = async () => {
+      try {
+        const response = await fetch(`https://gttech.pythonanywhere.com/elections/${selectedElection.id}/results/`);
+        const data = await response.json();
+        setResults(data);
+      } catch (err) {
+        setError('Failed to load results');
+      }
+    };
+
+    fetchResults();
+
+    // Connect to live updates
+    const socket = connectToLiveResults(selectedElection.id, (data) => {
+      setResults(data);
+    });
+
+    return () => socket.close();
+  }, [selectedElection]);
+
+  if (loading) return <div>Loading elections...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return (
+    <div>
+      <h2>Live Election Results</h2>
+      
+      {/* Election Selector */}
+      <div className="election-selector">
+        <label>Select Election: </label>
+        <select 
+          value={selectedElection?.id || ''} 
+          onChange={(e) => {
+            const election = elections.find(el => el.id === parseInt(e.target.value));
+            setSelectedElection(election);
+          }}
+        >
+          <option value="">Choose an election...</option>
+          {elections.map(election => (
+            <option key={election.id} value={election.id}>
+              {election.title} ({election.status})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Results Display */}
+      {selectedElection && results && (
+        <div>
+          <h3>{results.title} - Live Results</h3>
+          <div className="status-badge">
+            Status: {selectedElection.status}
+          </div>
+          
+          {results.positions.map((position) => (
+            <div key={position.position_id} className="position-results">
+              <h4>{position.position_title}</h4>
+              {position.candidates.map((candidate) => (
+                <div key={candidate.candidate_id} className="candidate-result">
+                  <span className="candidate-name">{candidate.candidate_name}</span>
+                  <span className="vote-count">{candidate.vote_count} votes</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PublicElectionResults;
+```
+
+### Election Results Component
 ```javascript
 import React, { useState, useEffect } from 'react';
 

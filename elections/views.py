@@ -5,11 +5,6 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 from django.db.models import Count
-try:
-    from channels.layers import get_channel_layer
-except ImportError:
-    # Fallback for older versions
-    from channels import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.contrib.auth import authenticate
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
@@ -22,6 +17,13 @@ from .serializers import (
 from .permissions import IsAdminOrReadOnly, IsEligibleVoter
 from .utils import log_audit
 from django.http import JsonResponse
+
+# Handle channels import gracefully
+try:
+    from channels.layers import get_channel_layer
+except ImportError:
+    # Fallback for older versions
+    from channels import get_channel_layer
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -638,6 +640,65 @@ class ElectionResultsView(APIView):
                 {'detail': 'Election not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+class PublicElectionsView(APIView):
+    """
+    Public endpoint to list active and completed elections for unauthenticated users
+    """
+    permission_classes = [permissions.AllowAny]  # Public endpoint
+    
+    @extend_schema(
+        tags=['elections'],
+        summary="List Public Elections",
+        description="Get a list of active and completed elections (Public endpoint - no authentication required)",
+        responses={
+            200: {
+                'type': 'array',
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                        'id': {'type': 'integer', 'description': 'Election ID'},
+                        'title': {'type': 'string', 'description': 'Election title'},
+                        'description': {'type': 'string', 'description': 'Election description'},
+                        'status': {'type': 'string', 'description': 'Election status'},
+                        'start_datetime': {'type': 'string', 'format': 'date-time'},
+                        'end_datetime': {'type': 'string', 'format': 'date-time'},
+                    }
+                }
+            }
+        },
+        examples=[
+            OpenApiExample(
+                'Public Elections List',
+                value=[
+                    {
+                        'id': 1,
+                        'title': 'Student Council Election 2024',
+                        'description': 'Annual student council election',
+                        'status': 'active',
+                        'start_datetime': '2024-03-01T09:00:00Z',
+                        'end_datetime': '2024-03-01T17:00:00Z'
+                    },
+                    {
+                        'id': 2,
+                        'title': 'Class Representative Election 2024',
+                        'description': 'Class representative election',
+                        'status': 'completed',
+                        'start_datetime': '2024-02-15T09:00:00Z',
+                        'end_datetime': '2024-02-15T17:00:00Z'
+                    }
+                ],
+                status_codes=['200']
+            )
+        ]
+    )
+    def get(self, request):
+        # Only show active and completed elections to the public
+        elections = Election.objects.filter(
+            status__in=['active', 'completed']
+        ).values('id', 'title', 'description', 'status', 'start_datetime', 'end_datetime')
+        
+        return Response(list(elections))
 
 def api_root(request):
     return JsonResponse({"message": "Welcome to the College Election API."}) 
