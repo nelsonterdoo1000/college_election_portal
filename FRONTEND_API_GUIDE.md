@@ -81,7 +81,41 @@ console.log(elections);
 //     "description": "Annual student council election",
 //     "status": "active",
 //     "start_datetime": "2024-03-01T09:00:00Z",
-//     "end_datetime": "2024-03-01T17:00:00Z"
+//     "end_datetime": "2024-03-01T17:00:00Z",
+//     "positions": [
+//       {
+//         "position_id": 1,
+//         "position_title": "President",
+//         "candidates": [
+//           {
+//             "candidate_id": 1,
+//             "candidate_name": "John Doe",
+//             "vote_count": 45
+//           },
+//           {
+//             "candidate_id": 2,
+//             "candidate_name": "Jane Smith",
+//             "vote_count": 38
+//           }
+//         ]
+//       },
+//       {
+//         "position_id": 2,
+//         "position_title": "Vice President",
+//         "candidates": [
+//           {
+//             "candidate_id": 3,
+//             "candidate_name": "Mike Johnson",
+//             "vote_count": 52
+//           },
+//           {
+//             "candidate_id": 4,
+//             "candidate_name": "Sarah Wilson",
+//             "vote_count": 31
+//           }
+//         ]
+//       }
+//     ]
 //   },
 //   {
 //     "id": 2,
@@ -89,7 +123,8 @@ console.log(elections);
 //     "description": "Class representative election",
 //     "status": "completed",
 //     "start_datetime": "2024-02-15T09:00:00Z",
-//     "end_datetime": "2024-02-15T17:00:00Z"
+//     "end_datetime": "2024-02-15T17:00:00Z",
+//     "positions": [...]
 //   }
 // ]
 ```

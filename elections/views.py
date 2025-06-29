@@ -651,7 +651,7 @@ class PublicElectionsView(APIView):
     @extend_schema(
         tags=['elections'],
         summary="List Public Elections",
-        description="Get a list of active and completed elections (Public endpoint - no authentication required)",
+        description="Get a list of active and completed elections with complete results data (Public endpoint - no authentication required)",
         responses={
             200: {
                 'type': 'array',
@@ -664,13 +664,34 @@ class PublicElectionsView(APIView):
                         'status': {'type': 'string', 'description': 'Election status'},
                         'start_datetime': {'type': 'string', 'format': 'date-time'},
                         'end_datetime': {'type': 'string', 'format': 'date-time'},
+                        'positions': {
+                            'type': 'array',
+                            'items': {
+                                'type': 'object',
+                                'properties': {
+                                    'position_id': {'type': 'integer'},
+                                    'position_title': {'type': 'string'},
+                                    'candidates': {
+                                        'type': 'array',
+                                        'items': {
+                                            'type': 'object',
+                                            'properties': {
+                                                'candidate_id': {'type': 'integer'},
+                                                'candidate_name': {'type': 'string'},
+                                                'vote_count': {'type': 'integer'}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         },
         examples=[
             OpenApiExample(
-                'Public Elections List',
+                'Public Elections with Results',
                 value=[
                     {
                         'id': 1,
@@ -678,15 +699,25 @@ class PublicElectionsView(APIView):
                         'description': 'Annual student council election',
                         'status': 'active',
                         'start_datetime': '2024-03-01T09:00:00Z',
-                        'end_datetime': '2024-03-01T17:00:00Z'
-                    },
-                    {
-                        'id': 2,
-                        'title': 'Class Representative Election 2024',
-                        'description': 'Class representative election',
-                        'status': 'completed',
-                        'start_datetime': '2024-02-15T09:00:00Z',
-                        'end_datetime': '2024-02-15T17:00:00Z'
+                        'end_datetime': '2024-03-01T17:00:00Z',
+                        'positions': [
+                            {
+                                'position_id': 1,
+                                'position_title': 'President',
+                                'candidates': [
+                                    {
+                                        'candidate_id': 1,
+                                        'candidate_name': 'John Doe',
+                                        'vote_count': 45
+                                    },
+                                    {
+                                        'candidate_id': 2,
+                                        'candidate_name': 'Jane Smith',
+                                        'vote_count': 38
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ],
                 status_codes=['200']
@@ -694,12 +725,29 @@ class PublicElectionsView(APIView):
         ]
     )
     def get(self, request):
-        # Only show active and completed elections to the public
+        # Get active and completed elections with full results data
         elections = Election.objects.filter(
             status__in=['active', 'completed']
-        ).values('id', 'title', 'description', 'status', 'start_datetime', 'end_datetime')
+        )
         
-        return Response(list(elections))
+        # Use ElectionResultsSerializer to get complete data including positions, candidates, and vote counts
+        serializer = ElectionResultsSerializer(elections, many=True)
+        
+        # Add additional election metadata to each result
+        results = []
+        for election, election_data in zip(elections, serializer.data):
+            result = {
+                'id': election.id,
+                'title': election.title,
+                'description': election.description,
+                'status': election.status,
+                'start_datetime': election.start_datetime,
+                'end_datetime': election.end_datetime,
+                'positions': election_data['positions']  # This includes candidates and vote counts
+            }
+            results.append(result)
+        
+        return Response(results)
 
 def api_root(request):
     return JsonResponse({"message": "Welcome to the College Election API."})
