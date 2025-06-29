@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 from django.db.models import Count
+from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.contrib.auth import authenticate
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
@@ -27,7 +28,7 @@ except ImportError:
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
-    
+
     @extend_schema(
         tags=['authentication'],
         summary="User Login",
@@ -96,7 +97,7 @@ class LoginView(APIView):
         username = request.data.get('username')
         password = request.data.get('password')
         user = authenticate(request, username=username, password=password)
-        
+
         if user is not None:
             refresh = RefreshToken.for_user(user)
             return Response({
@@ -105,7 +106,7 @@ class LoginView(APIView):
                 'user': UserSerializer(user).data
             })
         return Response(
-            {'error': 'Invalid credentials'}, 
+            {'error': 'Invalid credentials'},
             status=status.HTTP_401_UNAUTHORIZED
         )
 
@@ -142,7 +143,7 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAdminUser]
-    
+
     @extend_schema(
         tags=['users'],
         summary="List Users",
@@ -151,7 +152,7 @@ class UserViewSet(viewsets.ModelViewSet):
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
-    
+
     @extend_schema(
         tags=['users'],
         summary="Create User",
@@ -160,7 +161,7 @@ class UserViewSet(viewsets.ModelViewSet):
     )
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
-    
+
     @extend_schema(
         tags=['users'],
         summary="Get User Details",
@@ -174,7 +175,7 @@ class ElectionViewSet(viewsets.ModelViewSet):
     queryset = Election.objects.all()
     serializer_class = ElectionSerializer
     permission_classes = [IsAdminOrReadOnly]
-    
+
     @extend_schema(
         tags=['elections'],
         summary="List Elections",
@@ -183,7 +184,7 @@ class ElectionViewSet(viewsets.ModelViewSet):
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
-    
+
     @extend_schema(
         tags=['elections'],
         summary="Create Election",
@@ -192,7 +193,7 @@ class ElectionViewSet(viewsets.ModelViewSet):
     )
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
-    
+
     @extend_schema(
         tags=['elections'],
         summary="Get Election Details",
@@ -201,16 +202,16 @@ class ElectionViewSet(viewsets.ModelViewSet):
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
-    
+
     def get_queryset(self):
         if self.request.user.role == User.ADMIN:
             return Election.objects.all()
         return Election.objects.filter(eligible_voters__student=self.request.user)
-    
+
     def perform_create(self, serializer):
         election = serializer.save(created_by=self.request.user)
         log_audit(self.request.user, 'create_election', f'Created election: {election.title}')
-    
+
     @extend_schema(
         tags=['elections'],
         summary="Start Election",
@@ -238,12 +239,12 @@ class ElectionViewSet(viewsets.ModelViewSet):
                 {'error': 'Only pending elections can be started'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         election.status = 'active'
         election.save()
         log_audit(request.user, 'start_election', f'Started election: {election.title}')
         return Response({'status': 'election started'})
-    
+
     @extend_schema(
         tags=['elections'],
         summary="End Election",
@@ -271,7 +272,7 @@ class ElectionViewSet(viewsets.ModelViewSet):
                 {'error': 'Only active elections can be ended'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         election.status = 'completed'
         election.save()
         log_audit(request.user, 'end_election', f'Ended election: {election.title}')
@@ -280,7 +281,7 @@ class ElectionViewSet(viewsets.ModelViewSet):
 class PositionViewSet(viewsets.ModelViewSet):
     serializer_class = PositionSerializer
     permission_classes = [IsAdminOrReadOnly]
-    
+
     @extend_schema(
         tags=['positions'],
         summary="List Positions",
@@ -298,7 +299,7 @@ class PositionViewSet(viewsets.ModelViewSet):
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
-    
+
     @extend_schema(
         tags=['positions'],
         summary="Create Position",
@@ -316,7 +317,7 @@ class PositionViewSet(viewsets.ModelViewSet):
     )
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
-    
+
     @extend_schema(
         tags=['positions'],
         summary="Get Position Details",
@@ -341,14 +342,14 @@ class PositionViewSet(viewsets.ModelViewSet):
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
-    
+
     def get_queryset(self):
         return Position.objects.filter(election_id=self.kwargs['election_pk'])
 
 class CandidateViewSet(viewsets.ModelViewSet):
     serializer_class = CandidateSerializer
     permission_classes = [IsAdminOrReadOnly]
-    
+
     @extend_schema(
         tags=['candidates'],
         summary="List Candidates",
@@ -373,7 +374,7 @@ class CandidateViewSet(viewsets.ModelViewSet):
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
-    
+
     @extend_schema(
         tags=['candidates'],
         summary="Create Candidate",
@@ -398,7 +399,7 @@ class CandidateViewSet(viewsets.ModelViewSet):
     )
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
-    
+
     @extend_schema(
         tags=['candidates'],
         summary="Get Candidate Details",
@@ -430,14 +431,14 @@ class CandidateViewSet(viewsets.ModelViewSet):
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
-    
+
     def get_queryset(self):
         return Candidate.objects.filter(position_id=self.kwargs['position_pk'])
 
 class VoteViewSet(viewsets.ModelViewSet):
     serializer_class = VoteSerializer
     permission_classes = [IsEligibleVoter]
-    
+
     @extend_schema(
         tags=['voting'],
         summary="List User's Votes",
@@ -446,7 +447,7 @@ class VoteViewSet(viewsets.ModelViewSet):
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
-    
+
     @extend_schema(
         tags=['voting'],
         summary="Get Vote Details",
@@ -464,7 +465,7 @@ class VoteViewSet(viewsets.ModelViewSet):
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
-    
+
     @extend_schema(
         tags=['voting'],
         summary="Cast a Vote",
@@ -484,20 +485,20 @@ class VoteViewSet(viewsets.ModelViewSet):
         election_id = request.data.get('election')
         position_id = request.data.get('position')
         candidate_id = request.data.get('candidate')
-        
+
         # Check if user has already voted for this position in this election
         existing_vote = Vote.objects.filter(
             election_id=election_id,
             position_id=position_id,
             student=request.user
         ).first()
-        
+
         if existing_vote:
             return Response(
                 {'error': 'You have already voted for this position in this election'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Create the vote
         vote = Vote.objects.create(
             election_id=election_id,
@@ -505,7 +506,7 @@ class VoteViewSet(viewsets.ModelViewSet):
             candidate_id=candidate_id,
             student=request.user
         )
-        
+
         # Mark user as having voted
         eligible_voter = EligibleVoter.objects.get(
             election_id=election_id,
@@ -513,10 +514,10 @@ class VoteViewSet(viewsets.ModelViewSet):
         )
         eligible_voter.has_voted = True
         eligible_voter.save()
-        
+
         # Log the vote
         log_audit(request.user, 'cast_vote', f'Voted for candidate {vote.candidate.name} in {vote.position.title}')
-        
+
         # Send real-time update
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
@@ -526,10 +527,10 @@ class VoteViewSet(viewsets.ModelViewSet):
                 'election_id': election_id
             }
         )
-        
+
         serializer = self.get_serializer(vote)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
+
     def get_queryset(self):
         return Vote.objects.filter(student=self.request.user)
 
@@ -537,7 +538,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.all().order_by('-timestamp')
     serializer_class = AuditLogSerializer
     permission_classes = [permissions.IsAdminUser]
-    
+
     @extend_schema(
         tags=['audit'],
         summary="List Audit Logs",
@@ -546,7 +547,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
-    
+
     @extend_schema(
         tags=['audit'],
         summary="Get Audit Log Details",
@@ -561,7 +562,7 @@ class ElectionResultsView(APIView):
     Dedicated view for getting election results - easily discoverable in Swagger
     """
     permission_classes = [permissions.AllowAny]  # Public endpoint
-    
+
     @extend_schema(
         tags=['elections'],
         summary="Get Election Results",
@@ -632,7 +633,7 @@ class ElectionResultsView(APIView):
                     {'error': 'Results are only available for active or completed elections'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
+
             serializer = ElectionResultsSerializer(election)
             return Response(serializer.data)
         except Election.DoesNotExist:
@@ -701,4 +702,4 @@ class PublicElectionsView(APIView):
         return Response(list(elections))
 
 def api_root(request):
-    return JsonResponse({"message": "Welcome to the College Election API."}) 
+    return JsonResponse({"message": "Welcome to the College Election API."})
