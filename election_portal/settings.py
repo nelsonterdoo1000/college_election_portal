@@ -15,7 +15,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,nocen-nelsonterdoo.pythonanywhere.com').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'nocen.careerdevnetwork.com,localhost,127.0.0.1,nocen-nelsonterdoo.pythonanywhere.com,213.199.34.226').split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -68,13 +68,19 @@ TEMPLATES = [
 WSGI_APPLICATION = 'election_portal.wsgi.application'
 ASGI_APPLICATION = 'election_portal.asgi.application'
 
+
 # Database
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'election_portal_db',
+        'USER': 'postgres',
+        'PASSWORD': 'password',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
+
 
 # Channel layers for WebSocket
 CHANNEL_LAYERS = {
@@ -112,8 +118,9 @@ USE_I18N = True
 USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_URL = '/static/'
+STATIC_ROOT = '/var/www/election_portal/static/'
+
 MEDIA_URL = 'media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 

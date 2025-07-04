@@ -1,0 +1,11 @@
+[0;1;32m●[0m election_portal.service - Gunicorn daemon for election_portal Django project
+     Loaded: loaded (]8;;file://vmi2688141/etc/systemd/system/election_portal.service/etc/systemd/system/election_portal.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;32mactive (running)[0m since Wed 2025-07-02 22:29:55 CEST; 36ms ago
+   Main PID: 4260 (gunicorn)
+      Tasks: 1 (limit: 9486)
+     Memory: 896.0K (peak: 1.0M)
+        CPU: 16ms
+     CGroup: /system.slice/election_portal.service
+             └─[0;38;5;245m4260 /root/myproject/college_election_portal/venv/bin/python3 /root/myproject/college_election_portal/venv/bin/gunicorn election_portal.asgi:application -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000[0m
+
+Jul 02 22:29:55 vmi2688141 systemd[1]: Started election_portal.service - Gunicorn daemon for election_portal Django project.
