@@ -23,18 +23,20 @@ class IsEligibleVoter(permissions.BasePermission):
         if not request.user or request.user.role != 'student':
             return False
 
-        # For POST requests (voting), check if user is eligible
+        # For POST requests (voting), check if user is eligible for the election
         if request.method == 'POST':
             election_id = request.data.get('election')
             if not election_id:
                 return False
 
             try:
-                eligible_voter = EligibleVoter.objects.get(
+                # Check if user is eligible for this election
+                # Note: We don't check has_voted here because users can vote for multiple positions
+                EligibleVoter.objects.get(
                     election_id=election_id,
                     student=request.user
                 )
-                return not eligible_voter.has_voted
+                return True
             except EligibleVoter.DoesNotExist:
                 return False
 

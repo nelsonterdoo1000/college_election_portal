@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.db.models import Count
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, logout as django_logout
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog
@@ -18,6 +18,8 @@ from .serializers import (
 from .permissions import IsAdminOrReadOnly, IsEligibleVoter
 from .utils import log_audit
 from django.http import JsonResponse
+from django.shortcuts import redirect
+from django.contrib import messages
 
 # Handle channels import gracefully
 try:
@@ -138,6 +140,18 @@ class LogoutView(APIView):
             return Response(status=status.HTTP_205_RESET_CONTENT)
         except Exception:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+
+class SimpleLogoutView(APIView):
+    """
+    Simple logout view that works with GET requests and redirects to login
+    """
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        # Logout the user
+        django_logout(request)
+        messages.success(request, 'You have been successfully logged out.')
+        return redirect('login')  # Redirect to login page
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -507,13 +521,9 @@ class VoteViewSet(viewsets.ModelViewSet):
             student=request.user
         )
 
-        # Mark user as having voted
-        eligible_voter = EligibleVoter.objects.get(
-            election_id=election_id,
-            student=request.user
-        )
-        eligible_voter.has_voted = True
-        eligible_voter.save()
+        # Note: We do NOT mark the entire election as voted
+        # Users can vote for multiple positions in the same election
+        # The has_voted flag in EligibleVoter is only used to track overall participation
 
         # Log the vote
         log_audit(request.user, 'cast_vote', f'Voted for candidate {vote.candidate.name} in {vote.position.title}')

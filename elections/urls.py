@@ -30,6 +30,9 @@ urlpatterns = [
     path('auth/logout/', views.LogoutView.as_view(), name='logout'),
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
+    # Simple logout for web interface
+    path('logout/', views.SimpleLogoutView.as_view(), name='simple-logout'),
+    
     # Public endpoints
     path('elections/', views.PublicElectionsView.as_view(), name='public-elections'),
     path('elections/<int:election_id>/results/', views.ElectionResultsView.as_view(), name='election-results'),
