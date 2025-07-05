@@ -1,7 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_nested import routers
-from rest_framework_simplejwt.views import TokenRefreshView
 from django.shortcuts import redirect
 from . import views
 from .views import api_root
@@ -28,7 +27,7 @@ urlpatterns = [
     # Authentication endpoints
     path('auth/login/', views.LoginView.as_view(), name='login'),
     path('auth/logout/', views.LogoutView.as_view(), name='logout'),
-    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/token/refresh/', views.RefreshTokenView.as_view(), name='token_refresh'),
     
     # Simple logout for web interface
     path('logout/', views.SimpleLogoutView.as_view(), name='simple-logout'),
@@ -36,6 +35,9 @@ urlpatterns = [
     # Public endpoints
     path('elections/', views.PublicElectionsView.as_view(), name='public-elections'),
     path('elections/<int:election_id>/results/', views.ElectionResultsView.as_view(), name='election-results'),
+    
+    # User-specific endpoints (requires authentication)
+    path('elections/<int:election_id>/with-vote-status/', views.ElectionWithVoteStatusView.as_view(), name='election-with-vote-status'),
     
     # API endpoints
     path('api/', include(router.urls)),

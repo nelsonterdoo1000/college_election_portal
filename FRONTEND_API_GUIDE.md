@@ -194,9 +194,6 @@ const castVote = async (electionId, positionId, candidateId) => {
     }),
   });
 };
-
-// Note: Users can vote for multiple positions in the same election
-// Each position can only be voted for once per user
 ```
 
 ### 6. Get User's Votes

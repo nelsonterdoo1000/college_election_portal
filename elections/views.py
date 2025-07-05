@@ -13,7 +13,8 @@ from drf_spectacular.types import OpenApiTypes
 from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog
 from .serializers import (
     UserSerializer, ElectionSerializer, PositionSerializer, CandidateSerializer,
-    EligibleVoterSerializer, VoteSerializer, AuditLogSerializer, ElectionResultsSerializer
+    EligibleVoterSerializer, VoteSerializer, AuditLogSerializer, ElectionResultsSerializer,
+    ElectionWithVoteStatusSerializer
 )
 from .permissions import IsAdminOrReadOnly, IsEligibleVoter
 from .utils import log_audit
@@ -135,11 +136,29 @@ class LogoutView(APIView):
     def post(self, request):
         try:
             refresh_token = request.data.get('refresh')
+            if not refresh_token:
+                return Response(
+                    {'error': 'Refresh token is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             token = RefreshToken(refresh_token)
             token.blacklist()
-            return Response(status=status.HTTP_205_RESET_CONTENT)
-        except Exception:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            
+            # Log the logout action
+            log_audit(request.user, 'logout', 'User logged out successfully')
+            
+            return Response(
+                {'message': 'Successfully logged out'},
+                status=status.HTTP_205_RESET_CONTENT
+            )
+        except Exception as e:
+            # Log the error for debugging
+            print(f"Logout error: {str(e)}")
+            return Response(
+                {'error': 'Invalid refresh token'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class SimpleLogoutView(APIView):
     """
@@ -152,6 +171,79 @@ class SimpleLogoutView(APIView):
         django_logout(request)
         messages.success(request, 'You have been successfully logged out.')
         return redirect('login')  # Redirect to login page
+
+class RefreshTokenView(APIView):
+    """
+    Custom refresh token view with better error handling and logging
+    """
+    permission_classes = [permissions.AllowAny]
+    
+    @extend_schema(
+        tags=['authentication'],
+        summary="Refresh Access Token",
+        description="Get a new access token using a valid refresh token",
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'refresh': {'type': 'string', 'description': 'Valid refresh token'},
+                },
+                'required': ['refresh']
+            }
+        },
+        responses={
+            200: {
+                'type': 'object',
+                'properties': {
+                    'access': {'type': 'string', 'description': 'New JWT access token'},
+                }
+            },
+            401: {
+                'type': 'object',
+                'properties': {
+                    'detail': {'type': 'string', 'description': 'Token is invalid or expired'},
+                }
+            }
+        },
+        examples=[
+            OpenApiExample(
+                'Successful Refresh',
+                value={'access': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...'},
+                status_codes=['200']
+            ),
+            OpenApiExample(
+                'Invalid Token',
+                value={'detail': 'Token is invalid or expired'},
+                status_codes=['401']
+            )
+        ]
+    )
+    def post(self, request):
+        try:
+            refresh_token = request.data.get('refresh')
+            if not refresh_token:
+                return Response(
+                    {'detail': 'Refresh token is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Create a new refresh token instance
+            refresh = RefreshToken(refresh_token)
+            
+            # Get new access token
+            access_token = str(refresh.access_token)
+            
+            return Response({
+                'access': access_token
+            })
+            
+        except Exception as e:
+            # Log the error for debugging
+            print(f"Token refresh error: {str(e)}")
+            return Response(
+                {'detail': 'Token is invalid or expired'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -758,6 +850,109 @@ class PublicElectionsView(APIView):
             results.append(result)
         
         return Response(results)
+
+class ElectionWithVoteStatusView(APIView):
+    """
+    Get election details with user's voting status for better UX
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @extend_schema(
+        tags=['elections'],
+        summary="Get Election with Voting Status",
+        description="Get election details including user's voting status for each position (Authenticated users only)",
+        parameters=[
+            OpenApiParameter(
+                name='election_id',
+                location=OpenApiParameter.PATH,
+                description='ID of the election',
+                required=True,
+                type=OpenApiTypes.INT
+            )
+        ],
+        responses={
+            200: ElectionWithVoteStatusSerializer,
+            404: {
+                'type': 'object',
+                'properties': {
+                    'detail': {'type': 'string', 'description': 'Election not found'}
+                }
+            }
+        },
+        examples=[
+            OpenApiExample(
+                'Election with Vote Status',
+                value={
+                    'id': 1,
+                    'title': 'Student Council Election 2024',
+                    'description': 'Annual student council election',
+                    'status': 'active',
+                    'user_is_eligible': True,
+                    'user_total_votes': 2,
+                    'positions': [
+                        {
+                            'id': 1,
+                            'title': 'President',
+                            'user_has_voted': True,
+                            'user_vote': {
+                                'candidate_id': 1,
+                                'candidate_name': 'John Doe',
+                                'timestamp': '2024-03-01T10:30:00Z'
+                            },
+                            'candidates': [
+                                {
+                                    'id': 1,
+                                    'name': 'John Doe',
+                                    'has_voted_for': True
+                                },
+                                {
+                                    'id': 2,
+                                    'name': 'Jane Smith',
+                                    'has_voted_for': False
+                                }
+                            ]
+                        },
+                        {
+                            'id': 2,
+                            'title': 'Vice President',
+                            'user_has_voted': False,
+                            'user_vote': None,
+                            'candidates': [
+                                {
+                                    'id': 3,
+                                    'name': 'Bob Johnson',
+                                    'has_voted_for': False
+                                }
+                            ]
+                        }
+                    ]
+                },
+                status_codes=['200']
+            )
+        ]
+    )
+    def get(self, request, election_id):
+        try:
+            election = Election.objects.get(id=election_id)
+            
+            # Check if user is eligible for this election
+            if not EligibleVoter.objects.filter(
+                election=election,
+                student=request.user
+            ).exists():
+                return Response(
+                    {'error': 'You are not eligible to vote in this election'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            serializer = ElectionWithVoteStatusSerializer(election, context={'request': request})
+            return Response(serializer.data)
+            
+        except Election.DoesNotExist:
+            return Response(
+                {'detail': 'Election not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 def api_root(request):
     return JsonResponse({"message": "Welcome to the College Election API."})
