@@ -63,7 +63,12 @@ class Candidate(models.Model):
     position = models.ForeignKey(Position, on_delete=models.CASCADE, related_name='candidates')
     name = models.CharField(max_length=100)
     bio = models.TextField(blank=True)
-    photo = models.ImageField(upload_to='candidate_photos/', null=True, blank=True)
+    photo = models.ImageField(
+        upload_to='election_portal/candidate_photos/', 
+        null=True, 
+        blank=True,
+        help_text="Upload candidate photo (recommended size: 400x400px)"
+    )
     order = models.PositiveIntegerField(default=0)
     
     class Meta:

@@ -16,7 +16,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'nocen.careerdevnetwork.com,localhost,127.0.0.1,nocen-nelsonterdoo.pythonanywhere.com,213.199.34.226').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'nocen.careerdevnetwork.com,localhost,127.0.0.1,nocen-nelsonterdoo.pythonanywhere.com,213.199.34.226,cloudinary.com').split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'channels',
     'corsheaders',
     'drf_spectacular',
+    'cloudinary_storage',  # Cloudinary for media files
 
     # Local apps
     'elections',
@@ -124,8 +125,21 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = '/var/www/election_portal/static/'
 
-MEDIA_URL = 'media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# Cloudinary Configuration
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME', 'your-cloud-name'),
+    'API_KEY': os.getenv('CLOUDINARY_API_KEY', 'your-api-key'),
+    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET', 'your-api-secret'),
+}
+
+# Media files configuration
+MEDIA_URL = '/media/'
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+# Fallback to local storage for development
+if DEBUG:
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -18,9 +18,7 @@ class CandidateSerializer(serializers.ModelSerializer):
     
     def get_photo_url(self, obj):
         if obj.photo:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.photo.url)
+            # Cloudinary URLs are already absolute
             return obj.photo.url
         return None
 
@@ -108,9 +106,7 @@ class CandidateWithVoteStatusSerializer(serializers.ModelSerializer):
     
     def get_photo_url(self, obj):
         if obj.photo:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.photo.url)
+            # Cloudinary URLs are already absolute
             return obj.photo.url
         return None
     
