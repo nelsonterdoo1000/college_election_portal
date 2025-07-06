@@ -1,6 +1,14 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
+from cloudinary_storage.storage import MediaCloudinaryStorage
+import os
+
+def candidate_photo_path(instance, filename):
+    """Generate file path for candidate photos"""
+    ext = filename.split('.')[-1]
+    filename = f"{instance.name.replace(' ', '_')}_{instance.id}.{ext}"
+    return f"election_candidates/{filename}"
 
 class User(AbstractUser):
     STUDENT = 'student'
@@ -64,9 +72,10 @@ class Candidate(models.Model):
     name = models.CharField(max_length=100)
     bio = models.TextField(blank=True)
     photo = models.ImageField(
-        upload_to='candidates/', 
+        upload_to=candidate_photo_path, 
         null=True, 
         blank=True,
+        storage=MediaCloudinaryStorage(),
         help_text="Upload candidate photo (recommended size: 400x400px)"
     )
     order = models.PositiveIntegerField(default=0)
