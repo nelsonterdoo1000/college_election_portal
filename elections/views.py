@@ -613,9 +613,19 @@ class VoteViewSet(viewsets.ModelViewSet):
             student=request.user
         )
 
-        # Note: We do NOT mark the entire election as voted
+        # Update the has_voted flag to indicate participation in this election
         # Users can vote for multiple positions in the same election
-        # The has_voted flag in EligibleVoter is only used to track overall participation
+        # The has_voted flag in EligibleVoter tracks overall participation
+        try:
+            eligible_voter = EligibleVoter.objects.get(
+                election_id=election_id,
+                student=request.user
+            )
+            eligible_voter.has_voted = True
+            eligible_voter.save()
+        except EligibleVoter.DoesNotExist:
+            # This shouldn't happen due to permission checks, but handle gracefully
+            log_audit(request.user, 'error', f'EligibleVoter record not found for election {election_id}')
 
         # Log the vote
         log_audit(request.user, 'cast_vote', f'Voted for candidate {vote.candidate.name} in {vote.position.title}')
@@ -889,6 +899,7 @@ class ElectionWithVoteStatusView(APIView):
                     'status': 'active',
                     'user_is_eligible': True,
                     'user_total_votes': 2,
+                    'user_has_participated': True,
                     'positions': [
                         {
                             'id': 1,

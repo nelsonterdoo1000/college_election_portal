@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from typing import List, Dict, Any
+from django.conf import settings
 from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog
 
 class UserSerializer(serializers.ModelSerializer):
@@ -9,9 +10,19 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['role']
 
 class CandidateSerializer(serializers.ModelSerializer):
+    photo_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = Candidate
-        fields = ['id', 'name', 'bio', 'photo', 'position']
+        fields = ['id', 'name', 'bio', 'photo', 'photo_url', 'position']
+    
+    def get_photo_url(self, obj):
+        if obj.photo:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.photo.url)
+            return obj.photo.url
+        return None
 
 class PositionSerializer(serializers.ModelSerializer):
     candidates = CandidateSerializer(many=True, read_only=True)
@@ -89,10 +100,19 @@ class AuditLogSerializer(serializers.ModelSerializer):
 # New serializers for better user experience
 class CandidateWithVoteStatusSerializer(serializers.ModelSerializer):
     has_voted_for = serializers.SerializerMethodField()
+    photo_url = serializers.SerializerMethodField()
     
     class Meta:
         model = Candidate
-        fields = ['id', 'name', 'bio', 'photo', 'has_voted_for']
+        fields = ['id', 'name', 'bio', 'photo', 'photo_url', 'has_voted_for']
+    
+    def get_photo_url(self, obj):
+        if obj.photo:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.photo.url)
+            return obj.photo.url
+        return None
     
     def get_has_voted_for(self, obj):
         request = self.context.get('request')
@@ -153,11 +173,12 @@ class ElectionWithVoteStatusSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
     user_is_eligible = serializers.SerializerMethodField()
     user_total_votes = serializers.SerializerMethodField()
+    user_has_participated = serializers.SerializerMethodField()
     
     class Meta:
         model = Election
         fields = ['id', 'title', 'description', 'start_datetime', 'end_datetime', 
-                 'status', 'created_by', 'positions', 'user_is_eligible', 'user_total_votes']
+                 'status', 'created_by', 'positions', 'user_is_eligible', 'user_total_votes', 'user_has_participated']
         read_only_fields = ['status', 'created_by']
     
     def get_user_is_eligible(self, obj):
@@ -178,4 +199,18 @@ class ElectionWithVoteStatusSerializer(serializers.ModelSerializer):
         return Vote.objects.filter(
             election=obj,
             student=request.user
-        ).count() 
+        ).count()
+    
+    def get_user_has_participated(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        
+        try:
+            eligible_voter = EligibleVoter.objects.get(
+                election=obj,
+                student=request.user
+            )
+            return eligible_voter.has_voted
+        except EligibleVoter.DoesNotExist:
+            return False 
