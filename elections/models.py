@@ -64,7 +64,7 @@ class Candidate(models.Model):
     name = models.CharField(max_length=100)
     bio = models.TextField(blank=True)
     photo = models.ImageField(
-        upload_to='election_portal/candidate_photos/', 
+        upload_to='candidates/', 
         null=True, 
         blank=True,
         help_text="Upload candidate photo (recommended size: 400x400px)"
@@ -115,4 +115,4 @@ class AuditLog(models.Model):
         ordering = ['-timestamp']
     
     def __str__(self):
-        return f"{self.action} by {self.user.username if self.user else 'System'} at {self.timestamp}" 
+        return f"{self.action} by {self.user.username if self.user else 'System'} at {self.timestamp}"

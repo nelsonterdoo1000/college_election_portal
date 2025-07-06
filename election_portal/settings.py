@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from datetime import timedelta
-
 # Load environment variables
 load_dotenv()
 
@@ -11,7 +10,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
-
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
@@ -33,6 +31,7 @@ INSTALLED_APPS = [
     'channels',
     'corsheaders',
     'drf_spectacular',
+    'cloudinary',  # Must come before cloudinary_storage
     'cloudinary_storage',  # Cloudinary for media files
 
     # Local apps
@@ -71,7 +70,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'election_portal.wsgi.application'
 ASGI_APPLICATION = 'election_portal.asgi.application'
 
-
 # Database
 DATABASES = {
     'default': {
@@ -83,7 +81,6 @@ DATABASES = {
         'PORT': '5432',
     }
 }
-
 
 # Channel layers for WebSocket
 CHANNEL_LAYERS = {
@@ -120,12 +117,11 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = '/var/www/election_portal/static/'
 
-# Cloudinary Configuration
+# Cloudinary Configuration (single configuration)
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME', 'your-cloud-name'),
     'API_KEY': os.getenv('CLOUDINARY_API_KEY', 'your-api-key'),
@@ -134,10 +130,13 @@ CLOUDINARY_STORAGE = {
 
 # Media files configuration
 MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # Keep for compatibility
+
+# Use Cloudinary for media files
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
-# Always use Cloudinary for media files
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # Keep for compatibility
+# Optional: Use Cloudinary for static files too (uncomment if needed)
+# STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticHashedCloudinaryStorage'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
