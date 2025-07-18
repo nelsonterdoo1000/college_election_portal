@@ -14,7 +14,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'nocen.careerdevnetwork.com,localhost,127.0.0.1,nocen-nelsonterdoo.pythonanywhere.com,213.199.34.226,cloudinary.com').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'nocen.careerdevnetwork.com,localhost,127.0.0.1,nocen-nelsonterdoo.pythonanywhere.com,213.199.34.226,cloudinary.com,api.nocenelections.com',).split(',')
 
 # Application definition
 INSTALLED_APPS = [
