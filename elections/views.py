@@ -21,6 +21,12 @@ from .utils import log_audit
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.contrib import messages
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_decode
+from django.contrib.auth import get_user_model
+from django.conf import settings
+from django.core.mail import send_mail
+from django.utils.encoding import force_bytes
 
 # Handle channels import gracefully
 try:
@@ -28,6 +34,8 @@ try:
 except ImportError:
     # Fallback for older versions
     from channels import get_channel_layer
+
+User = get_user_model()
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -964,6 +972,45 @@ class ElectionWithVoteStatusView(APIView):
                 {'detail': 'Election not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+class PasswordResetRequestView(APIView):
+    permission_classes = []
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            # For security, do not reveal if user exists
+            return Response({'message': 'If the email is registered, a reset link will be sent.'})
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_decode(force_bytes(user.pk))
+        frontend_reset_url = getattr(settings, 'FRONTEND_RESET_URL', 'https://nocenelections.com/reset-password')
+        reset_url = f"{frontend_reset_url}/{uid}/{token}/"
+        subject = "Set your password for College Election Portal"
+        message = f"Hello {user.first_name or user.username},\n\nYou requested a password reset. Please set your password using the link below:\n{reset_url}\n\nIf you did not expect this email, please ignore it."
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
+        return Response({'message': 'If the email is registered, a reset link will be sent.'})
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = []
+    def post(self, request):
+        uidb64 = request.data.get('uid')
+        token = request.data.get('token')
+        new_password = request.data.get('new_password')
+        if not uidb64 or not token or not new_password:
+            return Response({'error': 'uid, token, and new_password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({'error': 'Invalid link.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not default_token_generator.check_token(user, token):
+            return Response({'error': 'Invalid or expired token.'}, status=status.HTTP_400_BAD_REQUEST)
+        user.set_password(new_password)
+        user.save()
+        return Response({'message': 'Password has been reset successfully.'})
 
 def api_root(request):
     return JsonResponse({"message": "Welcome to the College Election API."})

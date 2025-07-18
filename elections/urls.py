@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_nested import routers
 from django.shortcuts import redirect
 from . import views
-from .views import api_root
+from .views import api_root, PasswordResetRequestView, PasswordResetConfirmView
 
 # Create a router and register our viewsets with it
 router = DefaultRouter()
@@ -43,4 +43,9 @@ urlpatterns = [
     path('api/', include(router.urls)),
     path('api/', include(elections_router.urls)),
     path('api/', include(positions_router.urls)),
+]
+
+urlpatterns += [
+    path('auth/password-reset/', PasswordResetRequestView.as_view(), name='password_reset'),
+    path('auth/password-reset-confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
 ] 
