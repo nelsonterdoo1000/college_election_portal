@@ -14,7 +14,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,213.199.34.226,cloudinary.com,api.nocenelections.com',).split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,213.199.34.226,cloudinary.com,api.nocenelections.com,nocenelections.com',).split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -219,7 +219,10 @@ SPECTACULAR_SETTINGS = {
         'hideDownloadButton': True,
     },
 }
-
+CSRF_TRUSTED_ORIGINS = [
+       "https://api.nocenelections.com",
+       "https://nocenelections.com",
+   ]
 FRONTEND_RESET_URL = os.getenv('FRONTEND_RESET_URL', 'https://nocenelections.com/reset-password')
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
