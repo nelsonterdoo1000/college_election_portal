@@ -227,9 +227,9 @@ CSRF_TRUSTED_ORIGINS = [
 FRONTEND_RESET_URL = os.getenv('FRONTEND_RESET_URL', 'https://nocenelections.com/reset-password')
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.yourprovider.com'      # e.g., 'smtp.gmail.com' or your SMTP provider
+EMAIL_HOST = 'smtp.zoho.com'      # e.g., 'smtp.gmail.com' or your SMTP provider
 EMAIL_PORT = 587                          # or 465 for SSL
-EMAIL_HOST_USER = 'your@email.com'
-EMAIL_HOST_PASSWORD = 'your-email-password-or-app-password'
+EMAIL_HOST_USER = 'admin@nocenelections.com'
+EMAIL_HOST_PASSWORD = 'dud3fiM$'
 EMAIL_USE_TLS = True                      # or EMAIL_USE_SSL = True for port 465
 DEFAULT_FROM_EMAIL = 'NOCEN Elections <admin@nocenelections.com>'
