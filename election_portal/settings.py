@@ -224,6 +224,11 @@ CSRF_TRUSTED_ORIGINS = [
        "https://api.nocenelections.com",
        "https://nocenelections.com",
    ]
+# Trust the X-Forwarded-Proto header from Nginx or Cloudflare
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# Optional: Force HTTPS if needed
+SECURE_SSL_REDIRECT = True
+
 FRONTEND_RESET_URL = os.getenv('FRONTEND_RESET_URL', 'https://nocenelections.com/reset-password')
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
