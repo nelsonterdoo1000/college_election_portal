@@ -985,7 +985,7 @@ class PasswordResetRequestView(APIView):
             # For security, do not reveal if user exists
             return Response({'message': 'If the email is registered, a reset link will be sent.'})
         token = default_token_generator.make_token(user)
-        uid = urlsafe_base64_encode(force_bytes(user.pk)).decode()
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
         frontend_reset_url = getattr(settings, 'FRONTEND_RESET_URL', 'https://nocenelections.com/reset-password')
         reset_url = f"{frontend_reset_url}/{uid}/{token}/"
         subject = "Set your password for College Election Portal"
