@@ -43,6 +43,10 @@ urlpatterns = [
     path('api/', include(router.urls)),
     path('api/', include(elections_router.urls)),
     path('api/', include(positions_router.urls)),
+
+    path("election-assign-students/", views.ElectionAssignStudentsView.as_view(), name="election-assign-students"),
+
+
 ]
 
 urlpatterns += [

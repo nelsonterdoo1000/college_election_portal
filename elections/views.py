@@ -1014,3 +1014,66 @@ class PasswordResetConfirmView(APIView):
 
 def api_root(request):
     return JsonResponse({"message": "Welcome to the College Election API."})
+
+
+class ElectionAssignStudentsView(APIView):
+    """
+    View to assign students to elections based on their eligibility
+    """
+    permission_classes = [permissions.IsAdminUser]
+
+    @extend_schema(
+        tags=['elections'],
+        summary="Assign Students to Elections",
+        description="Assign students to elections based on their eligibility (Admin only)",
+        request={
+            'type': 'object',
+            'properties': {
+                'election_id': {'type': 'integer', 'description': 'ID of the election'}
+            }
+        },
+        responses={
+            200: {
+                'type': 'object',
+                'properties': {
+                    'message': {'type': 'string', 'description': 'Success message'}
+                }
+            },
+            400: {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string', 'description': 'Error message'}
+                }
+            }
+        }
+    )
+    def post(self, request):
+        try:
+            election_id = request.data.get('election_id')
+            if not election_id:
+                return Response({'error': 'Election ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            election = Election.objects.get(id=election_id)
+            if not election:
+                return Response({'error': 'Election not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Get all students who are eligible for this election
+            eligible_students = User.objects.filter(role=User.STUDENT, is_active=True)
+
+            # Create EligibleVoter records for each student
+            for student in eligible_students:
+                EligibleVoter.objects.get_or_create(election=election, student=student)
+
+            log_audit(request.user, 'assign_students', f'Assigned students to election: {election.title}')
+            return Response({'message': 'Students assigned to elections successfully.'}, status=status.HTTP_200_OK)
+        except Election.DoesNotExist:
+            return Response({'error': 'Election not found.'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            # Log the error for debugging
+            print(f"Error assigning students: {str(e)}")
+            return Response(
+                {'error': 'An error occurred while assigning students to elections.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except Exception as e:
+            return Response({'error': 'An error occurred while assigning students to elections.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)    
