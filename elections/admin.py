@@ -1,7 +1,10 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
+from django.contrib import messages
+from django.db import transaction
 from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog
+from .utils import log_audit
 
 class CustomUserCreationForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
@@ -35,6 +38,64 @@ class CustomUserAdmin(UserAdmin):
             'fields': ('username', 'email', 'student_id', 'role', 'password1', 'password2'),
         }),
     )
+    
+    actions = ['make_eligible_voters']
+    
+    def make_eligible_voters(self, request, queryset):
+        """Make selected users eligible voters for an election"""
+        # Get all available elections
+        elections = Election.objects.all().order_by('title')
+        
+        if not elections.exists():
+            self.message_user(request, 'No elections available.', level=messages.ERROR)
+            return
+        
+        # For now, we'll use the first election as default
+        # In a real implementation, you might want to add a custom admin form
+        # or use a different approach to select the election
+        election = elections.first()
+        
+        # Get existing eligible voters for this election
+        existing_eligible_voters = set(
+            EligibleVoter.objects.filter(election=election).values_list('student_id', flat=True)
+        )
+        
+        # Filter out users who are already eligible
+        new_eligible_user_ids = set(queryset.values_list('id', flat=True)) - existing_eligible_voters
+        
+        # Create EligibleVoter records for new users
+        eligible_voters_to_create = []
+        for user_id in new_eligible_user_ids:
+            eligible_voters_to_create.append(
+                EligibleVoter(election=election, student_id=user_id)
+            )
+        
+        if eligible_voters_to_create:
+            with transaction.atomic():
+                EligibleVoter.objects.bulk_create(eligible_voters_to_create)
+                
+                # Log the bulk operation
+                log_audit(
+                    request.user, 
+                    'bulk_add_eligible_voters', 
+                    f'Added {len(eligible_voters_to_create)} eligible voters to election: {election.title}'
+                )
+            
+            skipped_count = len(queryset) - len(new_eligible_user_ids)
+            self.message_user(
+                request, 
+                f'Successfully added {len(eligible_voters_to_create)} users as eligible voters for {election.title}. '
+                f'Skipped {skipped_count} users who were already eligible.',
+                level=messages.SUCCESS
+            )
+        else:
+            self.message_user(
+                request, 
+                f'All selected users are already eligible voters for {election.title}.',
+                level=messages.WARNING
+            )
+    
+    make_eligible_voters.short_description = "Make selected users eligible voters"
 
 class PositionInline(admin.TabularInline):
     model = Position
@@ -76,6 +137,42 @@ class EligibleVoterAdmin(admin.ModelAdmin):
     list_display = ('student', 'election', 'has_voted')
     list_filter = ('election', 'has_voted')
     search_fields = ('student__username', 'student__email', 'student__student_id')
+    actions = ['remove_eligible_voters']
+    
+    def remove_eligible_voters(self, request, queryset):
+        """Remove selected eligible voters"""
+        if not queryset.exists():
+            self.message_user(request, 'No eligible voters selected.', level=messages.WARNING)
+            return
+        
+        # Get the election from the first selected eligible voter
+        # This assumes all selected eligible voters are from the same election
+        election = queryset.first().election
+        
+        # Delete eligible voter records
+        deleted_count, _ = queryset.delete()
+        
+        if deleted_count > 0:
+            # Log the bulk operation
+            log_audit(
+                request.user, 
+                'bulk_remove_eligible_voters', 
+                f'Removed {deleted_count} eligible voters from election: {election.title}'
+            )
+            
+            self.message_user(
+                request, 
+                f'Successfully removed {deleted_count} users from eligible voters for {election.title}.',
+                level=messages.SUCCESS
+            )
+        else:
+            self.message_user(
+                request, 
+                f'No eligible voters were removed.',
+                level=messages.WARNING
+            )
+    
+    remove_eligible_voters.short_description = "Remove selected eligible voters"
 
 @admin.register(Vote)
 class VoteAdmin(admin.ModelAdmin):
