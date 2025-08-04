@@ -8,7 +8,7 @@ from django.db.models import Count
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.contrib.auth import authenticate, logout as django_logout
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
 from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog
 from .serializers import (
@@ -27,6 +27,7 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.mail import send_mail
 from django.utils.encoding import force_bytes
+
 
 # Handle channels import gracefully
 try:
@@ -1020,60 +1021,67 @@ class ElectionAssignStudentsView(APIView):
     """
     View to assign students to elections based on their eligibility
     """
-    permission_classes = [permissions.IsAdminUser]
+    # permission_classes = [permissions.IsAdminUser]
 
     @extend_schema(
-        tags=['elections'],
+        tags=["elections"],
         summary="Assign Students to Elections",
         description="Assign students to elections based on their eligibility (Admin only)",
         request={
             'type': 'object',
             'properties': {
-                'election_id': {'type': 'integer', 'description': 'ID of the election'}
-            }
-        },
-        responses={
-            200: {
-                'type': 'object',
-                'properties': {
-                    'message': {'type': 'string', 'description': 'Success message'}
+                'election_id': {
+                    'type': 'integer',
+                    'description': 'ID of the election',
+                    'example': 1
                 }
             },
-            400: {
-                'type': 'object',
-                'properties': {
-                    'error': {'type': 'string', 'description': 'Error message'}
-                }
-            }
+            'required': ['election_id']
+        },
+        responses={
+            200: OpenApiResponse(
+                response={"message": "Students assigned to elections successfully."},
+                description="Students assigned"
+            ),
+            400: OpenApiResponse(
+                response={"error": "Election ID is required."},
+                description="Bad Request"
+            ),
+            404: OpenApiResponse(
+                response={"error": "Election not found."},
+                description="Election Not Found"
+            ),
+            500: OpenApiResponse(
+                response={"error": "An error occurred while assigning students to elections."},
+                description="Internal Server Error"
+            ),
         }
     )
     def post(self, request):
+        election_id = request.data.get('election_id')
+        if not election_id:
+            return Response({'error': 'Election ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            election_id = request.data.get('election_id')
-            if not election_id:
-                return Response({'error': 'Election ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
             election = Election.objects.get(id=election_id)
-            if not election:
-                return Response({'error': 'Election not found.'}, status=status.HTTP_404_NOT_FOUND)
+        except Election.DoesNotExist:
+            return Response({'error': 'Election not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-            # Get all students who are eligible for this election
+        try:
             eligible_students = User.objects.filter(role=User.STUDENT, is_active=True)
 
-            # Create EligibleVoter records for each student
+            # Assign students — avoid duplicates with get_or_create or use bulk_create
             for student in eligible_students:
                 EligibleVoter.objects.get_or_create(election=election, student=student)
 
-            log_audit(request.user, 'assign_students', f'Assigned students to election: {election.title}')
+            log_audit(request.user, 'assign_students', f'Assigned {eligible_students.count()} students to election: {election.title}')
+
             return Response({'message': 'Students assigned to elections successfully.'}, status=status.HTTP_200_OK)
-        except Election.DoesNotExist:
-            return Response({'error': 'Election not found.'}, status=status.HTTP_404_NOT_FOUND)
+
         except Exception as e:
-            # Log the error for debugging
             print(f"Error assigning students: {str(e)}")
             return Response(
                 {'error': 'An error occurred while assigning students to elections.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        except Exception as e:
-            return Response({'error': 'An error occurred while assigning students to elections.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)    
+            )  
+        
