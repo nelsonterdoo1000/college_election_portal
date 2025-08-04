@@ -39,21 +39,24 @@ class CustomUserAdmin(UserAdmin):
         }),
     )
     
-    actions = ['make_eligible_voters']
+    actions = ['make_eligible_voters_for_active_election']
     
-    def make_eligible_voters(self, request, queryset):
-        """Make selected users eligible voters for an election"""
-        # Get all available elections
-        elections = Election.objects.all().order_by('title')
+    def make_eligible_voters_for_active_election(self, request, queryset):
+        """Make selected users eligible voters for the first active election"""
+        # Get the first active election
+        election = Election.objects.filter(status='active').first()
         
-        if not elections.exists():
+        if not election:
+            # If no active election, get the first upcoming election
+            election = Election.objects.filter(status='upcoming').first()
+        
+        if not election:
+            # If no active or upcoming election, get the first election
+            election = Election.objects.first()
+        
+        if not election:
             self.message_user(request, 'No elections available.', level=messages.ERROR)
             return
-        
-        # For now, we'll use the first election as default
-        # In a real implementation, you might want to add a custom admin form
-        # or use a different approach to select the election
-        election = elections.first()
         
         # Get existing eligible voters for this election
         existing_eligible_voters = set(
@@ -95,7 +98,7 @@ class CustomUserAdmin(UserAdmin):
                 level=messages.WARNING
             )
     
-    make_eligible_voters.short_description = "Make selected users eligible voters"
+    make_eligible_voters_for_active_election.short_description = "Make selected users eligible voters for active election"
 
 class PositionInline(admin.TabularInline):
     model = Position
