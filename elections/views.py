@@ -1021,7 +1021,7 @@ class ElectionAssignStudentsView(APIView):
     """
     View to assign students to elections based on their eligibility
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = []
 
     @extend_schema(
         tags=["elections"],
