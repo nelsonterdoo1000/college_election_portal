@@ -53,7 +53,7 @@ class UserResource(resources.ModelResource):
         # Only send emails if this is the actual import, not a dry-run preview
         dry_run = kwargs.get('dry_run', False)
         if not dry_run:
-            async_task('elections.tasks.send_password_reset_email', instance.id)
+            async_task('elections.tasks.send_password_reset_email', instance.id, task_name=instance.email)
 
 @admin.register(User)
 class CustomUserAdmin(ImportExportModelAdmin, UserAdmin):
