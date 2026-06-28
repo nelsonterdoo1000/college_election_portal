@@ -262,4 +262,23 @@ class AuditLogAdmin(admin.ModelAdmin):
     readonly_fields = ('user', 'action', 'details', 'timestamp', 'ip_address')
     
     def has_add_permission(self, request):
-        return False  # Audit logs can only be created through the system 
+        return False  # Audit logs can only be created through the system
+
+from django.contrib.admin.models import LogEntry
+
+@admin.register(LogEntry)
+class LogEntryAdmin(admin.ModelAdmin):
+    list_display = ('action_time', 'user', 'content_type', 'object_repr', 'action_flag')
+    list_filter = ('action_time', 'user', 'content_type', 'action_flag')
+    search_fields = ('object_repr', 'change_message')
+    date_hierarchy = 'action_time'
+    readonly_fields = ('user', 'content_type', 'object_id', 'object_repr', 'action_flag', 'change_message', 'action_time')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
