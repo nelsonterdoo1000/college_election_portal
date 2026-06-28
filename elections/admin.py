@@ -3,7 +3,15 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.contrib import messages
 from django.db import transaction
-from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
+from django.utils import timezone
+from datetime import timedelta
+import random
+from django.core.mail import send_mail
+from django.conf import settings
+from django_q.tasks import async_task
+from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog, OTPVerification
 from .utils import log_audit
 
 class CustomUserCreationForm(UserCreationForm):
@@ -15,8 +23,41 @@ class CustomUserChangeForm(UserChangeForm):
     class Meta(UserChangeForm.Meta):
         model = User
 
+class UserResource(resources.ModelResource):
+    class Meta:
+        model = User
+        import_id_fields = ('email',)
+        fields = ('email', 'first_name', 'last_name', 'username', 'role', 'is_active')
+        exclude = ('password',)
+
+    def before_import_row(self, row, **kwargs):
+        email = str(row.get('email', '')).strip().lower()
+        full_name = str(row.get('full_name', '')).strip()
+        
+        row['email'] = email
+        row['username'] = email
+        row['is_active'] = True
+        row['role'] = 'student'
+        
+        # Parse full_name: expected format 'Last First Second'
+        if full_name and 'first_name' not in row:
+            name_parts = full_name.split()
+            last_name = name_parts[0] if len(name_parts) > 0 else ''
+            first_name = name_parts[1] if len(name_parts) > 1 else ''
+            if len(name_parts) > 2:
+                first_name += " " + " ".join(name_parts[2:])
+            row['first_name'] = first_name
+            row['last_name'] = last_name
+
+    def after_save_instance(self, instance, row, **kwargs):
+        # Only send emails if this is the actual import, not a dry-run preview
+        dry_run = kwargs.get('dry_run', False)
+        if not dry_run:
+            async_task('elections.tasks.send_password_reset_email', instance.id)
+
 @admin.register(User)
-class CustomUserAdmin(UserAdmin):
+class CustomUserAdmin(ImportExportModelAdmin, UserAdmin):
+    resource_class = UserResource
     form = CustomUserChangeForm
     add_form = CustomUserCreationForm
     
@@ -104,8 +145,13 @@ class PositionInline(admin.TabularInline):
     model = Position
     extra = 1
 
+class ElectionResource(resources.ModelResource):
+    class Meta:
+        model = Election
+
 @admin.register(Election)
-class ElectionAdmin(admin.ModelAdmin):
+class ElectionAdmin(ImportExportModelAdmin):
+    resource_class = ElectionResource
     list_display = ('title', 'status', 'start_datetime', 'end_datetime', 'created_by')
     list_filter = ('status', 'created_at')
     search_fields = ('title', 'description')
@@ -122,21 +168,36 @@ class CandidateInline(admin.TabularInline):
     model = Candidate
     extra = 1
 
+class PositionResource(resources.ModelResource):
+    class Meta:
+        model = Position
+
 @admin.register(Position)
-class PositionAdmin(admin.ModelAdmin):
+class PositionAdmin(ImportExportModelAdmin):
+    resource_class = PositionResource
     list_display = ('title', 'election', 'order')
     list_filter = ('election',)
     search_fields = ('title', 'description')
     inlines = [CandidateInline]
 
+class CandidateResource(resources.ModelResource):
+    class Meta:
+        model = Candidate
+
 @admin.register(Candidate)
-class CandidateAdmin(admin.ModelAdmin):
+class CandidateAdmin(ImportExportModelAdmin):
+    resource_class = CandidateResource
     list_display = ('name', 'position', 'order')
     list_filter = ('position__election', 'position')
     search_fields = ('name', 'bio')
 
+class EligibleVoterResource(resources.ModelResource):
+    class Meta:
+        model = EligibleVoter
+
 @admin.register(EligibleVoter)
-class EligibleVoterAdmin(admin.ModelAdmin):
+class EligibleVoterAdmin(ImportExportModelAdmin):
+    resource_class = EligibleVoterResource
     list_display = ('student', 'election', 'has_voted')
     list_filter = ('election', 'has_voted')
     search_fields = ('student__username', 'student__email', 'student__student_id')
@@ -177,8 +238,13 @@ class EligibleVoterAdmin(admin.ModelAdmin):
     
     remove_eligible_voters.short_description = "Remove selected eligible voters"
 
+class VoteResource(resources.ModelResource):
+    class Meta:
+        model = Vote
+
 @admin.register(Vote)
-class VoteAdmin(admin.ModelAdmin):
+class VoteAdmin(ImportExportModelAdmin):
+    resource_class = VoteResource
     list_display = ('election', 'position', 'candidate', 'timestamp')
     list_filter = ('election', 'position', 'timestamp')
     search_fields = ('candidate__name',)

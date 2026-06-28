@@ -12,15 +12,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = os.getenv('DEBUG', 'True') == 'True'
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-DEBUG = False
-
+# Set default ALLOWED_HOSTS for local dev
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,213.199.34.226,cloudinary.com,api.nocenelections.com,nocenelections.com').split(',')
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,213.199.34.226,cloudinary.com,api.nocenelections.com,nocenelections.com',).split(',')
 
 # Application definition
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.auth',
     'django.contrib.admin',
     'django.contrib.contenttypes',
@@ -37,6 +37,8 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'cloudinary',  # Must come before cloudinary_storage
     'cloudinary_storage',  # Cloudinary for media files
+    'import_export',
+    'django_q',
 
     # Local apps
     'elections',
@@ -77,12 +79,8 @@ ASGI_APPLICATION = 'election_portal.asgi.application'
 # Database
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'election_portal_db',
-        'USER': 'postgres',
-        'PASSWORD': 'password',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -127,6 +125,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = '/var/www/election_portal/static/'
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 
 # Get Cloudinary credentials from environment
 CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME')
@@ -228,15 +229,67 @@ CSRF_TRUSTED_ORIGINS = [
    ]
 # Trust the X-Forwarded-Proto header from Nginx or Cloudflare
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-# Optional: Force HTTPS if needed
-SECURE_SSL_REDIRECT = True
+# Optional: Force HTTPS if needed (Disabled for local dev unless explicitly set)
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False') == 'True'
 
 FRONTEND_RESET_URL = os.getenv('FRONTEND_RESET_URL', 'https://nocenelections.com/reset-password')
 
+# ZeptoMail (SMTP) settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.hostinger.com'      # e.g., 'smtp.gmail.com' or your SMTP provider
-EMAIL_PORT = 587                          # or 465 for SSL
-EMAIL_HOST_USER = 'registration@nocenelections.com'
-EMAIL_HOST_PASSWORD = 'Pa$$mode2025'
-EMAIL_USE_TLS = True                      # or EMAIL_USE_SSL = True for port 465
-DEFAULT_FROM_EMAIL = 'NOCEN Elections <registration@nocenelections.com>'
+EMAIL_HOST = os.getenv('ZEPTO_EMAIL_HOST', 'smtp.zeptomail.com')
+EMAIL_PORT = int(os.getenv('ZEPTO_EMAIL_PORT', 587))
+
+if EMAIL_PORT == 465:
+    EMAIL_USE_SSL = True
+    EMAIL_USE_TLS = False
+else:
+    EMAIL_USE_SSL = False
+    EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = os.getenv('ZEPTO_EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('ZEPTO_EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@xpressbyte.ng')
+
+JAZZMIN_SETTINGS = {
+    "site_title": "College Election Admin",
+    "site_header": "College Election",
+    "site_brand": "Election Portal",
+    "site_logo": "img/logo.png",
+    "welcome_sign": "Welcome to the College Election Portal",
+    "search_model": ["elections.User", "elections.Election"],
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "auth.user": "fas fa-user",
+        "auth.Group": "fas fa-users",
+        "elections.User": "fas fa-user-graduate",
+        "elections.Election": "fas fa-vote-yea",
+        "elections.Position": "fas fa-briefcase",
+        "elections.Candidate": "fas fa-user-tie",
+        "elections.EligibleVoter": "fas fa-id-card",
+        "elections.Vote": "fas fa-box",
+        "elections.AuditLog": "fas fa-clipboard-list",
+        "elections.OTPVerification": "fas fa-key",
+    },
+    "custom_css": None,
+    "custom_js": None,
+    "show_ui_builder": False,
+    "order_with_respect_to": ["elections.Election", "elections.Position", "elections.Candidate", "elections.User", "elections.EligibleVoter", "elections.Vote", "elections.AuditLog"],
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "theme": "flatly",
+    "dark_mode_theme": "darkly",
+}
+
+# Django Q2 Configuration
+Q_CLUSTER = {
+    'name': 'DjangORM',
+    'workers': 4,
+    'timeout': 90,
+    'retry': 120,
+    'queue_limit': 500,
+    'bulk': 10,
+    'orm': 'default'
+}

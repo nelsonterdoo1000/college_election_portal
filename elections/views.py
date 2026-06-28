@@ -10,7 +10,9 @@ from asgiref.sync import async_to_sync
 from django.contrib.auth import authenticate, logout as django_logout
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
-from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog
+from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog, OTPVerification
+import random
+from datetime import timedelta
 from .serializers import (
     UserSerializer, ElectionSerializer, PositionSerializer, CandidateSerializer,
     EligibleVoterSerializer, VoteSerializer, AuditLogSerializer, ElectionResultsSerializer,
@@ -27,7 +29,6 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.mail import send_mail
 from django.utils.encoding import force_bytes
-
 
 # Handle channels import gracefully
 try:
@@ -984,34 +985,60 @@ class PasswordResetRequestView(APIView):
             user = User.objects.get(email=email)
         except User.DoesNotExist:
             # For security, do not reveal if user exists
-            return Response({'message': 'If the email is registered, a reset link will be sent.'})
-        token = default_token_generator.make_token(user)
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        frontend_reset_url = getattr(settings, 'FRONTEND_RESET_URL', 'https://nocenelections.com/reset-password')
-        reset_url = f"{frontend_reset_url}/{uid}/{token}/"
-        subject = "Set your password for College Election Portal"
-        message = f"Hello {user.first_name or user.username},\n\nYou requested a password reset. Please set your password using the link below:\n{reset_url}\n\nIf you did not expect this email, please ignore it."
+            return Response({'message': 'If the email is registered, a verification code will be sent.'})
+        
+        # Check for 2-minute cooldown
+        recent_otp = OTPVerification.objects.filter(user=user).order_by('-created_at').first()
+        if recent_otp and (timezone.now() - recent_otp.created_at) < timedelta(minutes=2):
+            return Response({'error': 'Please wait 2 minutes before requesting a new code.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+        # Generate 6-digit OTP
+        otp_code = str(random.randint(100000, 999999))
+        
+        OTPVerification.objects.create(
+            user=user,
+            otp=otp_code,
+            expires_at=timezone.now() + timedelta(minutes=15)
+        )
+        
+        subject = "Your Verification Code for College Election Portal"
+        message = (
+            f"Hello {user.first_name or user.username},\n\n"
+            f"You requested a password reset.\n"
+            f"Your verification code is: {otp_code}\n\n"
+            f"This code will expire in 15 minutes.\n"
+            f"If you did not expect this email, please ignore it."
+        )
         send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
-        return Response({'message': 'If the email is registered, a reset link will be sent.'})
+        return Response({'message': 'If the email is registered, a verification code will be sent.'})
 
 class PasswordResetConfirmView(APIView):
     permission_classes = []
     def post(self, request):
-        uidb64 = request.data.get('uid')
-        token = request.data.get('token')
+        email = request.data.get('email')
+        otp_code = request.data.get('otp')
         new_password = request.data.get('new_password')
-        if not uidb64 or not token or not new_password:
-            return Response({'error': 'uid, token, and new_password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not email or not otp_code or not new_password:
+            return Response({'error': 'email, otp, and new_password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
-            uid = urlsafe_base64_decode(uidb64).decode()
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return Response({'error': 'Invalid link.'}, status=status.HTTP_400_BAD_REQUEST)
-        if not default_token_generator.check_token(user, token):
-            return Response({'error': 'Invalid or expired token.'}, status=status.HTTP_400_BAD_REQUEST)
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({'error': 'Invalid email or OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Get the latest OTP for the user
+        latest_otp = OTPVerification.objects.filter(user=user, otp=otp_code).order_by('-created_at').first()
+        if not latest_otp or not latest_otp.is_valid():
+            return Response({'error': 'Invalid or expired OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+            
         user.set_password(new_password)
         user.save()
-        return Response({'message': 'Password has been reset successfully.'})
+        
+        # Mark OTP as used
+        latest_otp.is_used = True
+        latest_otp.save()
+        
+        return Response({'message': 'Password has been set successfully.'})
 
 def api_root(request):
     return JsonResponse({"message": "Welcome to the College Election API."})

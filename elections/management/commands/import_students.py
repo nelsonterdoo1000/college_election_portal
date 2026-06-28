@@ -2,9 +2,10 @@ from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.mail import send_mail
-from django.contrib.auth.tokens import default_token_generator
-from django.utils.http import urlsafe_base64_encode
-from django.utils.encoding import force_bytes
+from elections.models import OTPVerification
+from django.utils import timezone
+from datetime import timedelta
+import random
 import pandas as pd
 import os
 
@@ -73,10 +74,22 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(err))
 
     def send_password_reset_email(self, user):
-        token = default_token_generator.make_token(user)
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        frontend_reset_url = getattr(settings, 'FRONTEND_RESET_URL', 'https://nocenelections.com/reset-password')
-        reset_url = f"{frontend_reset_url}/{uid}/{token}/"
-        subject = "Set your password for College Election Portal"
-        message = f"Hello {user.first_name or user.username},\n\nYou have been registered as an eligible voter for the NOCEN Student Union Election 2025. Please set your password using the link below:\n{reset_url}\n\nIf you did not expect this email, please ignore it."
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True) 
+        # Generate 6-digit OTP
+        otp_code = str(random.randint(100000, 999999))
+        
+        # Save OTP to database (valid for 15 minutes)
+        OTPVerification.objects.create(
+            user=user,
+            otp=otp_code,
+            expires_at=timezone.now() + timedelta(minutes=15)
+        )
+        
+        subject = "Your Verification Code for College Election Portal"
+        message = (
+            f"Hello {user.first_name or user.username},\n\n"
+            f"You have been registered as an eligible voter for the NOCEN Student Union Election 2025.\n"
+            f"Your verification code to set your password is: {otp_code}\n\n"
+            f"This code will expire in 15 minutes.\n"
+            f"If you did not expect this email, please ignore it."
+        )
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
