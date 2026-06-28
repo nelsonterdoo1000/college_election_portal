@@ -28,6 +28,7 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes
 
 # Handle channels import gracefully
@@ -1002,14 +1003,27 @@ class PasswordResetRequestView(APIView):
         )
         
         subject = "Your Verification Code for College Election Portal"
+        
+        user_name = user.first_name or user.username
+        intro_text = "You requested a password reset."
+        
+        context = {
+            'user_name': user_name,
+            'intro_text': intro_text,
+            'otp_code': otp_code,
+            'reset_url': None,
+        }
+        
+        html_message = render_to_string('emails/otp_email.html', context)
+        
         message = (
-            f"Hello {user.first_name or user.username},\n\n"
-            f"You requested a password reset.\n"
+            f"Hello {user_name},\n\n"
+            f"{intro_text}\n"
             f"Your verification code is: {otp_code}\n\n"
             f"This code will expire in 15 minutes.\n"
             f"If you did not expect this email, please ignore it."
         )
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True, html_message=html_message)
         return Response({'message': 'If the email is registered, a verification code will be sent.'})
 
 class PasswordResetConfirmView(APIView):

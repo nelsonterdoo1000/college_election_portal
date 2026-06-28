@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
 from elections.models import OTPVerification
 from django.utils import timezone
 from datetime import timedelta
@@ -85,11 +86,24 @@ class Command(BaseCommand):
         )
         
         subject = "Your Verification Code for College Election Portal"
+        
+        user_name = user.first_name or user.username
+        intro_text = "You have been registered as an eligible voter for the NOCEN Student Union Election 2026."
+        
+        context = {
+            'user_name': user_name,
+            'intro_text': intro_text,
+            'otp_code': otp_code,
+            'reset_url': None,
+        }
+        
+        html_message = render_to_string('emails/otp_email.html', context)
+        
         message = (
-            f"Hello {user.first_name or user.username},\n\n"
-            f"You have been registered as an eligible voter for the NOCEN Student Union Election 2025.\n"
+            f"Hello {user_name},\n\n"
+            f"{intro_text}\n"
             f"Your verification code to set your password is: {otp_code}\n\n"
             f"This code will expire in 15 minutes.\n"
             f"If you did not expect this email, please ignore it."
         )
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True, html_message=html_message)
