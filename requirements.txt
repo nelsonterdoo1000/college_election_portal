@@ -13,7 +13,6 @@ constantly==23.10.4
 cryptography==45.0.4
 daphne==4.2.0
 Django==5.2.1
-django-channels==0.7.0
 django-cloudinary-storage==0.3.0
 django-cors-headers==4.7.0
 django-material-admin==1.8.6
