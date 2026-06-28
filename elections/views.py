@@ -644,7 +644,7 @@ class VoteViewSet(viewsets.ModelViewSet):
         # Send real-time update
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
-            f'election_{election_id}',
+            f'election_{election_id}_results',
             {
                 'type': 'election_results_update',
                 'election_id': election_id

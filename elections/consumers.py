@@ -33,7 +33,7 @@ class ElectionResultsConsumer(AsyncWebsocketConsumer):
     
     async def election_results_update(self, event):
         # Send updated results to WebSocket
-        results = event['results']
+        results = await self.get_election_results()
         await self.send(text_data=json.dumps(results))
     
     @database_sync_to_async
