@@ -13,8 +13,9 @@ import time
 
 def send_password_reset_email(user_id):
     try:
-        # Throttle sending heavily (5s) to ensure ZeptoMail and recipient servers don't soft bounce
-        time.sleep(5)
+        # 10 emails per minute = 1 email every 6s globally.
+        # With 2 workers, each worker must wait 12s per email (60s / 12s * 2 = 10).
+        time.sleep(12)
         user = User.objects.get(id=user_id)
         
         # Generate 6-digit OTP
