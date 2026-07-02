@@ -9,8 +9,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+import time
+
 def send_password_reset_email(user_id):
     try:
+        # Throttle sending to avoid SMTP soft bounces
+        time.sleep(2)
         user = User.objects.get(id=user_id)
         
         # Generate 6-digit OTP
