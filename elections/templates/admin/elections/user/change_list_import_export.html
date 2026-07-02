@@ -1,0 +1,8 @@
+{% extends "admin/import_export/change_list_import_export.html" %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    <a href="{% url 'admin:elections_user_resend_bounced' %}" class="btn btn-warning" style="background-color: #ffc107; color: black; border-color: #ffc107; margin-left: 10px;">
+        <i class="fas fa-envelope-open-text"></i> Resend Bounced Emails
+    </a>
+{% endblock %}
