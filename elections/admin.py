@@ -78,6 +78,7 @@ class CustomUserAdmin(ImportExportModelAdmin, UserAdmin):
     resource_class = UserResource
     form = CustomUserChangeForm
     add_form = CustomUserCreationForm
+    change_list_template = "admin/elections/user/change_list.html"
     
     list_display = ('username', 'email', 'student_id', 'role', 'is_staff')
     list_filter = ('role', 'is_staff', 'is_active')
