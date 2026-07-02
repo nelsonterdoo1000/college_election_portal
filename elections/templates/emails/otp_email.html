@@ -5,27 +5,28 @@
 {% block header_title %}NOCEN Student Union Election{% endblock %}
 
 {% block content %}
-    <p>Hello <strong>{{ user_name }}</strong>,</p>
-    
-    <p>{{ intro_text }}</p>
-    
-    <div class="otp-box">
-        {{ otp_code }}
-    </div>
-    
-    <p>This code will expire in <strong>15 minutes</strong>.</p>
-    
-    {% if reset_url %}
-    <p>Please click the button below to activate your account and set your password:</p>
-    
-    <div style="text-align: center;">
-        <a href="{{ reset_url }}" class="btn">Set My Password</a>
-    </div>
-    <br>
-    
-    <p class="info-text">Or copy and paste this link into your browser:<br>
-    <a href="{{ reset_url }}" style="color: #2563eb; word-break: break-all;">{{ reset_url }}</a></p>
-    {% endif %}
-    
-    <p class="info-text" style="margin-top: 40px; font-size: 12px;">If you did not expect this email, please ignore it.</p>
+<p>Hello <strong>{{ user_name }}</strong>,</p>
+
+<p>{{ intro_text }}</p>
+
+<div class="otp-box">
+    {{ otp_code }}
+</div>
+
+<p>This code will expire in <strong>24 hours</strong>.</p>
+
+{% if reset_url %}
+<p>Please click the button below to activate your account and set your password:</p>
+
+<div style="text-align: center;">
+    <a href="{{ reset_url }}" class="btn">Set My Password</a>
+</div>
+<br>
+
+<p class="info-text">Or copy and paste this link into your browser:<br>
+    <a href="{{ reset_url }}" style="color: #2563eb; word-break: break-all;">{{ reset_url }}</a>
+</p>
+{% endif %}
+
+<p class="info-text" style="margin-top: 40px; font-size: 12px;">If you did not expect this email, please ignore it.</p>
 {% endblock %}
