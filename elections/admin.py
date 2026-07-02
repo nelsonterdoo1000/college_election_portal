@@ -11,8 +11,26 @@ import random
 from django.core.mail import send_mail
 from django.conf import settings
 from django_q.tasks import async_task
+from django.urls import path
+from django.shortcuts import render, redirect
+from django.http import HttpResponseRedirect
+from django import forms
 from .models import User, Election, Position, Candidate, EligibleVoter, Vote, AuditLog, OTPVerification
 from .utils import log_audit
+
+
+class BouncedEmailsForm(forms.Form):
+    """Form for pasting bounced email addresses from ZeptoMail dashboard."""
+    emails = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'rows': 15,
+            'cols': 60,
+            'placeholder': 'Paste email addresses here, one per line:\n\nstudent1@school.edu\nstudent2@school.edu\n...',
+            'style': 'font-family: monospace; font-size: 13px;',
+        }),
+        label='Bounced Email Addresses',
+        help_text='Copy email addresses from ZeptoMail dashboard and paste them here, one per line.',
+    )
 
 class CustomUserCreationForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
@@ -80,7 +98,106 @@ class CustomUserAdmin(ImportExportModelAdmin, UserAdmin):
         }),
     )
     
-    actions = ['make_eligible_voters_for_active_election']
+    actions = ['make_eligible_voters_for_active_election', 'resend_otp_email']
+
+    # ------------------------------------------------------------------ #
+    #  Custom URLs — adds the "Resend Bounced Emails" page                #
+    # ------------------------------------------------------------------ #
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                'resend-bounced-emails/',
+                self.admin_site.admin_view(self.resend_bounced_emails_view),
+                name='elections_user_resend_bounced',
+            ),
+        ]
+        return custom_urls + urls
+
+    # ------------------------------------------------------------------ #
+    #  Action: select users → Resend OTP email                           #
+    # ------------------------------------------------------------------ #
+    def resend_otp_email(self, request, queryset):
+        """Admin action: resend OTP password-reset email to selected users."""
+        queued = 0
+        for user in queryset:
+            async_task(
+                'elections.tasks.send_password_reset_email',
+                user.id,
+                task_name=f"resend_{user.email}"
+            )
+            queued += 1
+
+        self.message_user(
+            request,
+            f'✉️  Queued OTP resend for {queued} user(s). '
+            f'Emails will be sent in the background by the worker.',
+            level=messages.SUCCESS,
+        )
+
+    resend_otp_email.short_description = "✉️ Resend OTP email to selected users"
+
+    # ------------------------------------------------------------------ #
+    #  Custom view: paste bounced emails from ZeptoMail                  #
+    # ------------------------------------------------------------------ #
+    def resend_bounced_emails_view(self, request):
+        """Admin page where you paste a block of bounced emails and resend them."""
+        if request.method == 'POST':
+            form = BouncedEmailsForm(request.POST)
+            if form.is_valid():
+                raw = form.cleaned_data['emails']
+                # Parse: split on newlines/commas/spaces, clean each token
+                import re
+                tokens = re.split(r'[\n\r,;\s]+', raw)
+                emails = [
+                    t.strip().lower()
+                    for t in tokens
+                    if t.strip() and '@' in t
+                ]
+                emails = list(dict.fromkeys(emails))  # deduplicate, preserve order
+
+                found_users = []
+                not_found = []
+                for email in emails:
+                    try:
+                        user = User.objects.get(email=email)
+                        found_users.append(user)
+                    except User.DoesNotExist:
+                        not_found.append(email)
+
+                # Queue async tasks for found users
+                for user in found_users:
+                    async_task(
+                        'elections.tasks.send_password_reset_email',
+                        user.id,
+                        task_name=f"resend_{user.email}"
+                    )
+
+                if found_users:
+                    self.message_user(
+                        request,
+                        f'✉️  Queued OTP resend for {len(found_users)} user(s).'
+                        + (f' {len(not_found)} address(es) not found in database.' if not_found else ''),
+                        level=messages.SUCCESS,
+                    )
+                if not_found and not found_users:
+                    self.message_user(
+                        request,
+                        f'❌ None of the {len(not_found)} address(es) were found in the database.',
+                        level=messages.ERROR,
+                    )
+
+                return redirect('admin:elections_user_changelist')
+        else:
+            form = BouncedEmailsForm()
+
+        context = {
+            **self.admin_site.each_context(request),
+            'title': 'Resend Bounced Emails',
+            'form': form,
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/elections/resend_bounced_emails.html', context)
     
     def make_eligible_voters_for_active_election(self, request, queryset):
         """Make selected users eligible voters for the first active election"""
