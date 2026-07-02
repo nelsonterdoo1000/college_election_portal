@@ -297,12 +297,18 @@ JAZZMIN_UI_TWEAKS = {
 }
 
 # Django Q2 Configuration
+# NOTE: For bulk email sending (~300 students per import batch):
+# - workers=2: Limits concurrent SMTP connections to ZeptoMail (avoids rate limit spikes)
+# - timeout=120: ZeptoMail SMTP can take up to ~30s; 120s gives plenty of headroom
+# - retry=180: Retry failed tasks after 3 minutes (avoids hammering a temporarily slow SMTP)
+# - queue_limit=400: Comfortably holds one full batch (300) + buffer; upload one batch at a time
+# - bulk=10: Django-Q fetches 10 tasks at once from DB (efficient DB polling)
 Q_CLUSTER = {
     'name': 'DjangORM',
-    'workers': 4,
-    'timeout': 90,
-    'retry': 120,
-    'queue_limit': 500,
+    'workers': 2,
+    'timeout': 120,
+    'retry': 180,
+    'queue_limit': 400,
     'bulk': 10,
     'orm': 'default'
 }
