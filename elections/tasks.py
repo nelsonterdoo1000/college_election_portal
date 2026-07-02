@@ -16,11 +16,11 @@ def send_password_reset_email(user_id):
         # Generate 6-digit OTP
         otp_code = str(random.randint(100000, 999999))
         
-        # Save OTP to database (valid for 15 minutes)
+        # Save OTP to database (valid for 24 hours — extended for bulk onboarding)
         OTPVerification.objects.create(
             user=user,
             otp=otp_code,
-            expires_at=timezone.now() + timedelta(minutes=15)
+            expires_at=timezone.now() + timedelta(hours=24)
         )
         
         subject = "Your Verification Code for NOCEN Student Union Election 2026"
@@ -44,7 +44,7 @@ def send_password_reset_email(user_id):
             f"Please visit the following link to activate your account and set your password:\n"
             f"{reset_url}\n\n"
             f"Your verification code is: {otp_code}\n\n"
-            f"This code will expire in 15 minutes.\n"
+            f"This code will expire in 24 hours.\n"
             f"If you did not expect this email, please ignore it."
         )
         
