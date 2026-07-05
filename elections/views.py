@@ -1005,13 +1005,14 @@ class PasswordResetRequestView(APIView):
         subject = "Your Verification Code for College Election Portal"
         
         user_name = user.first_name or user.username
+        reset_url = f"{settings.FRONTEND_RESET_URL}?email={user.email}"
         intro_text = "You requested a password reset."
         
         context = {
             'user_name': user_name,
             'intro_text': intro_text,
             'otp_code': otp_code,
-            'reset_url': None,
+            'reset_url': reset_url,
         }
         
         html_message = render_to_string('emails/otp_email.html', context)
@@ -1019,6 +1020,8 @@ class PasswordResetRequestView(APIView):
         message = (
             f"Hello {user_name},\n\n"
             f"{intro_text}\n"
+            f"Please visit the following link to reset your password:\n"
+            f"{reset_url}\n\n"
             f"Your verification code is: {otp_code}\n\n"
             f"This code will expire in 15 minutes.\n"
             f"If you did not expect this email, please ignore it."
